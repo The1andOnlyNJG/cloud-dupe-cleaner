@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('api', {
   startDropboxAuth: () => ipcRenderer.invoke('start-dropbox-auth'),
   startOnedriveAuth: () => ipcRenderer.invoke('start-onedrive-auth'),
   startScan: () => ipcRenderer.invoke('start-scan'),
+  deleteFiles: (files) => ipcRenderer.invoke('delete-files', files),
 
   onAuthResult: (callback) => {
     ipcRenderer.on('auth-result', (event, data) => callback(data));
