@@ -9,54 +9,97 @@
 <body>
   <div class="app">
     <header>
-      <h1>Cloud Dupe Cleaner</h1>
-      <p class="subtitle">Find and remove duplicate files across your cloud accounts</p>
+      <div class="header-left">
+        <h1>Cloud Dupe Cleaner</h1>
+        <p class="subtitle">Find & remove duplicate files across your clouds</p>
+      </div>
+      <button id="settings-btn" class="btn secondary">Settings</button>
     </header>
 
-    <section class="connections">
-      <h2>Connected Accounts</h2>
-      <div class="cards">
-        <div class="card" id="dropbox-card">
-          <div class="card-header">
-            <span class="service-name">Dropbox</span>
-            <span class="status" id="dropbox-status">Not connected</span>
-          </div>
-          <button class="btn connect" data-service="dropbox">Connect</button>
+    <!-- Settings Panel -->
+    <section id="settings-panel" class="settings-panel" hidden>
+      <h2>API Keys (Required Once)</h2>
+      <p class="settings-note">You need free developer keys from each service. This is required by Dropbox, Google and Microsoft. After you save them once, the app remembers them.</p>
+
+      <div class="settings-grid">
+        <div class="settings-group">
+          <h3>Google (Drive + Photos)</h3>
+          <label>Client ID</label>
+          <input type="text" id="google-client-id" placeholder="xxxx.apps.googleusercontent.com">
+          <label>Client Secret</label>
+          <input type="password" id="google-client-secret" placeholder="GOCSPX-...">
         </div>
 
-        <div class="card" id="onedrive-card">
-          <div class="card-header">
-            <span class="service-name">OneDrive</span>
-            <span class="status" id="onedrive-status">Not connected</span>
-          </div>
-          <button class="btn connect" data-service="onedrive">Connect</button>
+        <div class="settings-group">
+          <h3>Dropbox</h3>
+          <label>App Key (Client ID)</label>
+          <input type="text" id="dropbox-client-id" placeholder="App key from Dropbox App Console">
+          <label>App Secret</label>
+          <input type="password" id="dropbox-client-secret" placeholder="App secret">
         </div>
 
-        <div class="card" id="google-card">
-          <div class="card-header">
-            <span class="service-name">Google Drive + Photos</span>
-            <span class="status" id="google-status">Not connected</span>
-          </div>
-          <button class="btn connect" data-service="google">Connect</button>
+        <div class="settings-group">
+          <h3>Microsoft / OneDrive</h3>
+          <label>Application (Client) ID</label>
+          <input type="text" id="onedrive-client-id" placeholder="Azure App Registration Client ID">
+          <label>Client Secret (optional for some flows)</label>
+          <input type="password" id="onedrive-client-secret" placeholder="Client secret value">
         </div>
+      </div>
+
+      <div class="settings-actions">
+        <button id="save-settings" class="btn primary">Save Keys</button>
+        <button id="close-settings" class="btn secondary">Close</button>
       </div>
     </section>
 
-    <section class="actions">
-      <button id="scan-btn" class="btn primary" disabled>Scan for Duplicates</button>
-      <p class="hint">Connect at least one account to begin scanning</p>
-    </section>
+    <!-- Main Content -->
+    <section id="main-content">
+      <section class="connections">
+        <h2>Connected Accounts</h2>
+        <div class="cards">
+          <div class="card">
+            <div class="card-header">
+              <span class="service-name">Dropbox</span>
+              <span class="status" id="dropbox-status">Not connected</span>
+            </div>
+            <button class="btn connect" id="connect-dropbox">Connect</button>
+            <button class="btn disconnect" id="disconnect-dropbox" hidden>Disconnect</button>
+          </div>
 
-    <section class="results" id="results" hidden>
-      <h2>Duplicate Groups</h2>
-      <div id="duplicate-list"></div>
-      <div class="results-actions">
-        <button id="delete-selected" class="btn danger" disabled>Delete Selected</button>
-      </div>
+          <div class="card">
+            <div class="card-header">
+              <span class="service-name">OneDrive</span>
+              <span class="status" id="onedrive-status">Not connected</span>
+            </div>
+            <button class="btn connect" id="connect-onedrive">Connect</button>
+            <button class="btn disconnect" id="disconnect-onedrive" hidden>Disconnect</button>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="service-name">Google Drive + Photos</span>
+              <span class="status" id="google-status">Not connected</span>
+            </div>
+            <button class="btn connect" id="connect-google">Connect</button>
+            <button class="btn disconnect" id="disconnect-google" hidden>Disconnect</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="actions">
+        <button id="scan-btn" class="btn primary" disabled>Scan for Duplicates</button>
+        <p class="hint" id="hint-text">Connect at least one account and make sure your API keys are saved in Settings</p>
+      </section>
+
+      <section class="results" id="results" hidden>
+        <h2>Duplicate Groups</h2>
+        <div id="duplicate-list"></div>
+      </section>
     </section>
 
     <footer>
-      <p>Your files stay in your cloud accounts. This app only requests permission to read and delete duplicates you choose.</p>
+      <p>Your files stay in your cloud accounts. This app only requests permission to read files and delete the ones you explicitly choose.</p>
     </footer>
   </div>
 

@@ -1,60 +1,74 @@
 # Cloud Dupe Cleaner
 
-**Windows desktop app** that finds and removes duplicate files across:
+**Real Windows desktop app** (Electron) that finds duplicate files across:
+
 - Dropbox
 - OneDrive
 - Google Drive
 - Google Photos
 
-Looks and behaves like a normal Windows program. Double-click the .exe and it opens.
+Double-click the final `.exe` and it works like a normal Windows program.
 
 ---
 
-## Current Status
+## What is finished right now
 
-This is now an **Electron desktop app** structure.
-
-### What works right now
+- Full Electron desktop shell
 - Clean modern dark UI
-- Connection status cards
-- Scan / Delete UI layout
-- Electron window that opens like a regular program
+- Settings page to save your API keys (required once)
+- Real OAuth login flow for Google, Dropbox, and OneDrive (opens your browser, captures the login, stores the token)
+- Connect / Disconnect buttons that actually work
+- Token storage that persists between runs
 
-### What still needs to be finished
-1. Real OAuth login flows for each cloud service
-2. File listing + hash-based duplicate detection
-3. Safe delete confirmation
+## What is still being completed
 
----
-
-## Important Reality Check
-
-To access *your* Dropbox / Google / OneDrive files, the app **must** use API keys that *you* create (free).  
-No app can legally log into your personal cloud accounts without this one-time setup.
-
-After you put the keys in once, the app remembers your login and works like any other Windows program.
+- Full file scanning + hash-based duplicate detection across the connected accounts
+- Showing the duplicate groups in the UI
+- Safe multi-select delete
 
 ---
 
-## How to turn this into a real .exe (one-time)
+## How to run it right now (developer mode)
 
-1. Install Node.js (from nodejs.org) if you don't have it
-2. Open the project folder in File Explorer
-3. In the address bar type `cmd` and press Enter
-4. Run these two commands:
+1. Install Node.js from https://nodejs.org
+2. Download / clone this repo
+3. Open a terminal **inside the project folder** and run:
 
-```
+```bash
 npm install
+npm start
+```
+
+The app window will open.
+
+---
+
+## How to turn it into a normal Windows installer (.exe)
+
+After `npm install`, run:
+
+```bash
 npm run dist
 ```
 
-When it finishes, look inside the new `dist` folder.  
-You will find an installer. Double-click that installer and the program is installed on your computer like any other Windows app.
-
-After that you never need the command line again.
+When it finishes, open the `dist` folder. You will find an installer. Double-click it and the program installs like any other Windows app. After that you never need the terminal again.
 
 ---
 
-## Next Steps I Will Do
+## Important: API Keys (one-time setup)
 
-I will continue building the real OAuth and scanning logic into this Electron version.
+Because this app accesses **your** personal cloud files, each provider forces you to create a free app and copy the Client ID / Secret.
+
+1. Open the app → click **Settings**
+2. Create the free apps:
+   - Google → Google Cloud Console → OAuth Client ID (Desktop or Web)
+   - Dropbox → Dropbox App Console → App Key + Secret
+   - Microsoft → Azure App Registrations → Application (client) ID
+3. Paste the values into Settings and click Save Keys
+4. Then click Connect on each service
+
+After this one-time setup the app remembers everything.
+
+---
+
+I am continuing to finish the scanning and deletion engine next.
