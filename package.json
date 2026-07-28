@@ -1,0 +1,42 @@
+{
+  "name": "cloud-dupe-cleaner",
+  "version": "1.0.0",
+  "description": "Windows desktop app to find and remove duplicate files from Dropbox, OneDrive, Google Drive and Google Photos",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.njg.clouddupecleaner",
+    "productName": "Cloud Dupe Cleaner",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false
+    }
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "dropbox": "^10.34.0",
+    "googleapis": "^144.0.0",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "isomorphic-fetch": "^3.0.0"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  }
+}
