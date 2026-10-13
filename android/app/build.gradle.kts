@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -10,9 +12,39 @@ kotlin {
     }
 }
 
+fun cdcSetting(name: String): String? {
+    System.getenv(name)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    (findProperty(name) as? String)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    val localFile = rootProject.file("local.properties")
+    if (!localFile.isFile) return null
+    val props = Properties()
+    localFile.inputStream().use { props.load(it) }
+    return props.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }
+}
+
+val cdcStoreFile = cdcSetting("CDC_STORE_FILE")
+val cdcStorePassword = cdcSetting("CDC_STORE_PASSWORD")
+val cdcKeyAlias = cdcSetting("CDC_KEY_ALIAS")
+val cdcKeyPassword = cdcSetting("CDC_KEY_PASSWORD")
+val hasReleaseKey = cdcStoreFile != null &&
+    cdcStorePassword != null &&
+    cdcKeyAlias != null &&
+    cdcKeyPassword != null
+
 android {
     namespace = "com.njg.clouddupecleaner"
     compileSdk = 35
+
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                storeFile = file(cdcStoreFile!!)
+                storePassword = cdcStorePassword
+                keyAlias = cdcKeyAlias
+                keyPassword = cdcKeyPassword
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.njg.clouddupecleaner"
@@ -33,6 +65,9 @@ android {
         release {
             isMinifyEnabled = false
             isDebuggable = false
+            if (hasReleaseKey) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
         debug {
             isDebuggable = true
