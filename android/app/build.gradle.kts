@@ -50,8 +50,8 @@ android {
         applicationId = "com.njg.clouddupecleaner"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0.0"
         buildConfigField("String", "DROPBOX_CLIENT_ID", "\"\"")
         buildConfigField("String", "ONEDRIVE_CLIENT_ID", "\"\"")
         buildConfigField("String", "GOOGLE_CLIENT_ID", "\"\"")
@@ -63,8 +63,13 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             isDebuggable = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             if (hasReleaseKey) {
                 signingConfig = signingConfigs.getByName("release")
             }
@@ -83,6 +88,7 @@ android {
 dependencies {
     implementation(project(":core"))
     implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.browser:browser:1.8.0")
 }

@@ -644,9 +644,12 @@ export function createApp(options) {
     });
   }));
 
+  const publicDir = options.publicDir || resolvePublicDir();
+
   app.get('/favicon.ico', (req, res) => {
     void req;
-    res.status(204).end();
+    res.type('image/png');
+    res.sendFile(path.join(publicDir, 'favicon.png'));
   });
 
   app.use('/api', (req, res) => {
@@ -654,7 +657,7 @@ export function createApp(options) {
     res.status(404).json({ error: 'not_found', message: 'Unknown API route.' });
   });
 
-  app.use(express.static(options.publicDir || resolvePublicDir(), { index: 'index.html', fallthrough: false }));
+  app.use(express.static(publicDir, { index: 'index.html', fallthrough: false }));
 
   app.use((
     /** @type {unknown} */ error,
@@ -676,8 +679,17 @@ export function createApp(options) {
       res.status(400).json({ error: 'bad_json', message: 'Request body was not valid JSON.' });
       return;
     }
+    const wantsHtml = !req.path.startsWith('/api') && !req.path.startsWith('/auth');
     if (typeof error === 'object' && error && 'status' in error && error.status === 404) {
-      res.status(404).type('text/plain').send('Not found');
+      if (wantsHtml) {
+        res.status(404).sendFile(path.join(publicDir, '404.html'));
+        return;
+      }
+      res.status(404).json({ error: 'not_found', message: 'Unknown API route.' });
+      return;
+    }
+    if (wantsHtml) {
+      res.status(500).sendFile(path.join(publicDir, '500.html'));
       return;
     }
     res.status(500).json({ error: 'internal', message: 'Something went wrong.' });

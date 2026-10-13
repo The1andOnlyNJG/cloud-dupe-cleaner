@@ -1,0 +1,14 @@
+-keep class com.njg.clouddupecleaner.MainActivity { *; }
+-keep class com.njg.clouddupecleaner.OAuthRedirectActivity { *; }
+-keep class com.njg.clouddupecleaner.SecureTokenStore { *; }
+-keep class com.njg.clouddupecleaner.SecureTokenStore$Companion { *; }
+-keep class com.njg.clouddupecleaner.MemoryTokenStore { *; }
+-keep class com.njg.clouddupecleaner.BuildConfig { *; }
+-keep class androidx.security.crypto.** { *; }
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+-dontwarn com.google.errorprone.annotations.CanIgnoreReturnValue
+-dontwarn com.google.errorprone.annotations.CheckReturnValue
+-dontwarn com.google.errorprone.annotations.Immutable
+-dontwarn com.google.errorprone.annotations.RestrictedApi
+-dontwarn javax.annotation.Nullable
+-dontwarn javax.annotation.concurrent.GuardedBy

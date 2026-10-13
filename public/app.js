@@ -115,6 +115,8 @@ async function load() {
   providers = /** @type {ProviderRow[]} */ (session.data.providers || []);
   manualSteps = /** @type {string[]} */ (session.data.photosManualSteps || []);
   modePill.textContent = mockMode ? 'Sample library' : 'Live accounts';
+  const setup = document.getElementById('setup');
+  if (setup) setup.hidden = !mockMode;
   accountNote.textContent = mockMode
     ? 'Sample mode uses bundled previews. No account sign-in and no cloud calls.'
     : 'Live mode keeps tokens on the server. Previews use the read token already granted for scanning.';

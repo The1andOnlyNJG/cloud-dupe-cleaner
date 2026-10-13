@@ -4,14 +4,35 @@
         <item name="android:statusBarColor">#121614</item>
         <item name="android:navigationBarColor">#121614</item>
         <item name="android:windowBackground">#121614</item>
-        <item name="android:colorAccent">#B6D98A</item>
         <item name="android:textColor">#EEF3EF</item>
+        <item name="cdcBg">#121614</item>
+        <item name="cdcCard">#1C2420</item>
+        <item name="cdcTile">#24302A</item>
+        <item name="cdcText">#EEF3EF</item>
+        <item name="cdcMuted">#A3B5AA</item>
+        <item name="cdcAccent">#B6D98A</item>
+        <item name="cdcAccentInk">#16210E</item>
+        <item name="cdcLine">#33423A</item>
+        <item name="cdcDanger">#E07A62</item>
     </style>
     <style name="Theme.CloudDupe.Light" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">#F3F0E8</item>
         <item name="android:navigationBarColor">#F3F0E8</item>
         <item name="android:windowBackground">#F3F0E8</item>
-        <item name="android:colorAccent">#1F7A4D</item>
         <item name="android:textColor">#1D1A16</item>
+        <item name="cdcBg">#F3F0E8</item>
+        <item name="cdcCard">#FFFDF8</item>
+        <item name="cdcTile">#EFE8DA</item>
+        <item name="cdcText">#1D1A16</item>
+        <item name="cdcMuted">#5E584F</item>
+        <item name="cdcAccent">#1F7A4D</item>
+        <item name="cdcAccentInk">#F4FFF6</item>
+        <item name="cdcLine">#DDD4C4</item>
+        <item name="cdcDanger">#A33B2B</item>
+    </style>
+    <style name="Theme.CloudDupe.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#121614</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.CloudDupe</item>
     </style>
 </resources>
