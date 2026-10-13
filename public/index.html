@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cloud Dupe Cleaner</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="shell">
+    <header class="top">
+      <div>
+        <p class="eyebrow">Cloud Dupe Cleaner</p>
+        <h1>Keep one copy. Trash the rest.</h1>
+        <p class="lede">Scan Dropbox, OneDrive, Google Drive, and Google Photos. Content hashes are used when a provider gives one. Otherwise the match is name and size, and it is labeled as weaker. Extras move to trash only after you confirm.</p>
+      </div>
+      <p id="mode-pill" class="pill">Loading</p>
+    </header>
+
+    <div id="banner" class="banner" role="status" hidden></div>
+
+    <main id="main">
+      <section>
+        <div class="section-head">
+          <h2>Accounts</h2>
+          <p id="account-note">Connect an account to include it in the next scan.</p>
+        </div>
+        <div id="providers" class="providers"></div>
+      </section>
+
+      <section class="scan-row">
+        <div class="scan-actions">
+          <button id="scan" class="primary" type="button" disabled>Scan for duplicates</button>
+          <button id="select-extras" class="ghost" type="button" hidden>Select extra copies</button>
+        </div>
+        <p id="summary" class="summary">Connect an account to scan.</p>
+      </section>
+
+      <section id="results" class="results" aria-live="polite"></section>
+    </main>
+
+    <footer>
+      <p>Dropbox, Drive, and OneDrive moves go to that service’s trash or recycle bin. This app never permanently deletes. Google Photos has no trash API, so those copies are flagged for a review album or a manual step.</p>
+    </footer>
+  </div>
+
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title">
+    <h3 id="confirm-title">Move files to trash?</h3>
+    <p id="confirm-copy"></p>
+    <ul id="confirm-files"></ul>
+    <label class="ack">
+      <input id="confirm-ack" type="checkbox">
+      <span>I understand these files will be moved to the provider trash or recycle bin. They will not be permanently deleted.</span>
+    </label>
+    <p id="confirm-error" class="form-error" hidden></p>
+    <div class="dialog-actions">
+      <button id="confirm-cancel" type="button" class="ghost">Cancel</button>
+      <a id="confirm-grant" class="button" hidden>Grant trash access</a>
+      <button id="confirm-go" type="button" class="danger" disabled>Move to trash</button>
+    </div>
+  </dialog>
+
+  <dialog id="photos-dialog" aria-labelledby="photos-title">
+    <h3 id="photos-title">Google Photos cannot trash these</h3>
+    <p id="photos-copy"></p>
+    <ol id="photos-steps"></ol>
+    <p id="photos-error" class="form-error" hidden></p>
+    <div class="dialog-actions">
+      <button id="photos-close" type="button" class="ghost">Close</button>
+      <a id="photos-grant" class="button" hidden>Grant album access</a>
+      <button id="photos-album" type="button">Add to review album</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

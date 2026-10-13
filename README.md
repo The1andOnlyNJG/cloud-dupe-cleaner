@@ -1,74 +1,61 @@
 # Cloud Dupe Cleaner
 
-Windows desktop app that finds and removes duplicate files across:
+Web app and Android app that find duplicate files in Dropbox, OneDrive, Google Drive, and Google Photos.
 
-- **Dropbox** (content hash – strong)
-- **Google Drive** (md5 – strong)
-- **OneDrive** (size + name – weaker)
+Demo mode is the default. It uses sample files and does not contact those services, so you can run it without API credentials.
 
-Looks and feels like a normal Windows program.
+## Web app
 
----
-
-## What is finished
-
-- Electron desktop shell
-- Settings page for your free API keys (required once)
-- Real OAuth login for Google, Dropbox, and OneDrive
-- File listing from all three services
-- Duplicate detection using content hashes (Dropbox + Google) and size+name (OneDrive)
-- UI that shows duplicate groups with checkboxes
-- Safe delete (you must leave at least one copy)
-- Confirmation before any deletion
-
----
-
-## How to run it
-
-1. Install [Node.js](https://nodejs.org) (LTS version)
-2. Download this repo as ZIP and extract it
-3. Open the extracted folder in File Explorer
-4. In the address bar type `cmd` and press Enter
-5. Run these two commands:
-
-```
+```bash
 npm install
 npm start
 ```
 
-The app window will open.
+Open http://127.0.0.1:3000
 
----
+Connect a sample account, scan, and move a duplicate to trash. The move is refused until you confirm, and Google Photos items cannot be trashed. For Photos, add them to a review album or follow the manual steps.
 
-## Turn it into a real .exe installer (one-time)
+Checks:
 
-After `npm install`, run:
-
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
 ```
-npm run dist
+
+## How duplicates are chosen
+
+- Dropbox: `content_hash`
+- Google Drive: MD5, or SHA-1 when that is all Drive returns
+- OneDrive: SHA-1 or quickXor when Graph provides it
+- Otherwise: file size plus name, labeled as a weaker match
+- Google Photos does not provide a content hash. Items with no byte size are shown only when a size exists in the sample data. The live Photos API does not include byte size, so those items are not guessed into a group.
+
+Hashes are only compared inside the same algorithm.
+
+## Trash, not permanent delete
+
+- Dropbox `files/delete_v2` moves a file to deleted files
+- Google Drive `files.update` sets `trashed: true`. `files.delete` is refused
+- OneDrive `DELETE /me/drive/items/{id}` moves a file to the recycle bin. `permanentDelete` is refused
+- Google Photos has no trash API. The app will not send a delete. It can add items to an album named "Duplicate review" and shows the manual steps
+
+Every trash call requires the confirmation `MOVE_TO_TRASH` and leaves at least one copy in the group. Scanning uses read scopes. Trash and album scopes are requested only after you ask for that action.
+
+## Live OAuth
+
+Set `MOCK_PROVIDERS=false` and the client ids in `.env` (see `.env.example`). Secrets stay on the server. The browser never receives access tokens. Production refuses to start until `MOCK_PROVIDERS`, `PERSIST_TOKENS`, and `SESSION_SIGNING_KEY` are set explicitly. Token files are written only when `PERSIST_TOKENS=true`, and then only as AES-256-GCM ciphertext.
+
+## Android
+
+The Android project is in `android/`. Demo mode is on and does not open a provider login. Tokens go through `EncryptedSharedPreferences` and the Android Keystore. Backups are off, cleartext traffic is off, and the only exported components are the launcher and the OAuth redirect activity.
+
+Logic tests (JDK 21, no Android SDK):
+
+```bash
+cd android
+gradle :core:test
 ```
 
-When it finishes, open the new `dist` folder. Double-click the installer. After that the program installs like any normal Windows app and you never need the terminal again.
-
----
-
-## First-time setup (API keys)
-
-1. Open the app → click **Settings**
-2. Create free apps and paste the keys:
-   - **Google** → [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials → Create OAuth Client ID
-   - **Dropbox** → [Dropbox App Console](https://www.dropbox.com/developers/apps) → Create app → App key + App secret
-   - **Microsoft** → [Azure Portal](https://portal.azure.com/) → App registrations → New registration → Application (client) ID
-3. Save the keys
-4. Click **Connect** on each service you want to use
-5. Click **Scan for Duplicates**
-
-After this one-time setup the app remembers your logins.
-
----
-
-## Safety
-
-- You must leave at least one file in every duplicate group
-- Every delete requires confirmation
-- Files are only deleted from the cloud accounts you explicitly connected
+Install the debug app with Android Studio or `gradle :app:assembleDebug` once `ANDROID_HOME` is set.

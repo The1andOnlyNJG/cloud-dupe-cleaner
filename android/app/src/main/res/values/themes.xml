@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.CloudDupe" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#121614</item>
+        <item name="android:navigationBarColor">#121614</item>
+        <item name="android:windowBackground">#121614</item>
+        <item name="android:colorAccent">#B6D98A</item>
+        <item name="android:textColor">#EEF3EF</item>
+    </style>
+</resources>

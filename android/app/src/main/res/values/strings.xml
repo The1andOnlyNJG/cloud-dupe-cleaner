@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cloud Dupe Cleaner</string>
+    <string name="trash_message">These files will be moved to the provider trash or recycle bin. They will not be permanently deleted. Google Photos items are not included.</string>
+    <string name="photos_title">Google Photos cannot trash these</string>
+</resources>
