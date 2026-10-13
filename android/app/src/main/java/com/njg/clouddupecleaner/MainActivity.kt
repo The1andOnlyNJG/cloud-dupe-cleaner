@@ -21,8 +21,8 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         tokenStore = openStore()
-        PROVIDERS.forEach { provider ->
-            if (tokenStore.get("token.$provider") != null) connected.add(provider)
+        PROVIDERS.forEach { (id, _) ->
+            if (tokenStore.get("token.$id") != null) connected.add(id)
         }
         renderProviders()
         findViewById<Button>(R.id.scan).setOnClickListener { scan() }
