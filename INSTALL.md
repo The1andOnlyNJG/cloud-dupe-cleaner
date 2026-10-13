@@ -1,6 +1,6 @@
 # Install the Android app
 
-This is a sideload of the signed release APK, not a Play Store install. The build has no OAuth client IDs, so it runs in demo mode and does not sign in to Dropbox, OneDrive, or Google.
+This is a sideload of the release APK, not a Play Store install. A build with no OAuth client IDs stays in sample mode. A build that was given the Dropbox app key and Google Android client ID at build time signs in to those two accounts. OneDrive says Coming soon. Google Photos stays on sample files.
 
 ## Install
 
@@ -13,7 +13,7 @@ Package name: `com.njg.clouddupecleaner`.
 
 ## Test on the phone
 
-1. Tap Connect sample on Dropbox. It should switch to connected without opening a login page. Repeat for OneDrive, Google Drive, and Google Photos if you want every sample group.
+1. On a build with client IDs, Connect on Dropbox and Google Drive opens that provider's sign-in. OneDrive says Coming soon and does not open a browser. Google Photos still says Connect sample. On a build without client IDs, Dropbox and Drive also use sample files.
 2. Tap Scan for duplicates. You should see content-hash groups and at least one weaker name-and-size group. Google Photos rows say “No trash API” and have no trash checkbox.
 3. In a Dropbox or Drive group, select one extra copy and leave one copy unselected. Tap Move selected to trash, read the dialog, and confirm. The selected copy leaves the list. The message is about trash, not permanent deletion.
 4. Select every copy in a group and tap Move selected to trash. The app should refuse and tell you to leave one copy.

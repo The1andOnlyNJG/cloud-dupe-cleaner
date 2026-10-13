@@ -2,12 +2,16 @@ package com.njg.clouddupecleaner
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Typeface
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
+import android.util.LruCache
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -22,6 +26,7 @@ import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import java.text.DateFormat
 import java.util.Date
+import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
     private val library = MockLibrary()
@@ -29,7 +34,13 @@ class MainActivity : Activity() {
     private var groups: List<DuplicateGroup> = emptyList()
     private var keeperId: String = ""
     private lateinit var tokenStore: TokenStore
+    private lateinit var cloud: CloudClient
     private var dark = true
+    private var secureStore = true
+    private var scanning = false
+    private val lastFiles = mutableListOf<CloudFile>()
+    private val thumbCache = LruCache<String, Bitmap>(32)
+    private val work = Executors.newSingleThreadExecutor()
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,8 +50,9 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         tokenStore = openStore()
+        cloud = CloudClient(tokenStore, BuildConfig.DROPBOX_CLIENT_ID, BuildConfig.GOOGLE_CLIENT_ID)
         findViewById<TextView>(R.id.version).text = getString(R.string.app_name) + " " + BuildConfig.VERSION_NAME
-        findViewById<TextView>(R.id.setup).visibility = if (sampleMode()) View.VISIBLE else View.GONE
+        findViewById<TextView>(R.id.setup).visibility = if (needsSetupNote()) View.VISIBLE else View.GONE
         findViewById<Button>(R.id.theme_toggle).apply {
             text = if (dark) getString(R.string.theme_light) else getString(R.string.theme_dark)
             contentDescription = getString(R.string.theme_toggle)
@@ -49,13 +61,26 @@ class MainActivity : Activity() {
                 recreate()
             }
         }
-        PROVIDERS.forEach { (id, _) ->
-            if (tokenStore.get("token.$id") != null) connected.add(id)
-        }
+        reloadConnected()
         renderProviders()
-        showEmpty(getString(R.string.empty_connect))
+        showEmpty(getString(if (sampleMode()) R.string.empty_connect else R.string.empty_connect_live))
         findViewById<Button>(R.id.scan).setOnClickListener { scan() }
         watchNetwork()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!::tokenStore.isInitialized) return
+        reloadConnected()
+        renderProviders()
+        val resume = tokenStore.get("oauth_resume") ?: return
+        tokenStore.delete("oauth_resume")
+        if (resume == "trash") continuePendingTrash()
     }
 
     override fun onDestroy() {
@@ -67,9 +92,25 @@ class MainActivity : Activity() {
     }
 
     private fun sampleMode(): Boolean {
-        return BuildConfig.DROPBOX_CLIENT_ID.isEmpty() &&
-            BuildConfig.ONEDRIVE_CLIENT_ID.isEmpty() &&
-            BuildConfig.GOOGLE_CLIENT_ID.isEmpty()
+        return BuildConfig.DROPBOX_CLIENT_ID.isEmpty() && BuildConfig.GOOGLE_CLIENT_ID.isEmpty()
+    }
+
+    private fun needsSetupNote(): Boolean {
+        return BuildConfig.DROPBOX_CLIENT_ID.isEmpty() || BuildConfig.GOOGLE_CLIENT_ID.isEmpty()
+    }
+
+    private fun reloadConnected() {
+        connected.clear()
+        PROVIDERS.forEach { (id, _) ->
+            if (tokenStore.get("token.$id") != null) connected.add(id)
+        }
+    }
+
+    private fun onUi(block: () -> Unit) {
+        if (isDestroyed) return
+        runOnUiThread {
+            if (!isDestroyed) block()
+        }
     }
 
     private fun watchNetwork() {
@@ -119,9 +160,26 @@ class MainActivity : Activity() {
         return try {
             SecureTokenStore.open(this)
         } catch (_: Exception) {
+            secureStore = false
             showError(getString(R.string.secure_storage_unavailable))
             MemoryTokenStore()
         }
+    }
+
+    private fun isMock(provider: String): Boolean {
+        return tokenStore.get("token.$provider")?.startsWith("mock-access.") == true
+    }
+
+    private fun isLive(provider: String): Boolean {
+        return provider in connected && !isMock(provider) && (provider == "dropbox" || provider == "gdrive")
+    }
+
+    private fun needsTrashAuth(provider: String): Boolean {
+        if (isMock(provider)) return false
+        val required = ProviderScopes.trashScope(provider)
+        if (required.isEmpty()) return false
+        val granted = tokenStore.get("scopes.$provider").orEmpty().split(Regex("\\s+"))
+        return required !in granted
     }
 
     private fun renderProviders() {
@@ -130,90 +188,134 @@ class MainActivity : Activity() {
         PROVIDERS.forEach { (id, label) ->
             val row = layoutInflater.inflate(R.layout.item_provider, host, false)
             row.findViewById<TextView>(R.id.provider_name).text = label
-            row.findViewById<TextView>(R.id.provider_status).text =
-                if (id in connected) getString(R.string.connected) else getString(R.string.not_connected)
+            val status = row.findViewById<TextView>(R.id.provider_status)
             val action = row.findViewById<Button>(R.id.provider_action)
-            action.text = if (id in connected) getString(R.string.disconnect) else getString(R.string.connect_sample)
+            if (id == "onedrive") {
+                status.text = getString(R.string.coming_soon)
+                action.text = getString(R.string.coming_soon)
+                action.isEnabled = false
+            } else {
+                status.text = if (id in connected) getString(R.string.connected) else getString(R.string.not_connected)
+                val live = clientId(id).isNotEmpty()
+                action.text = when {
+                    id in connected -> getString(R.string.disconnect)
+                    live -> getString(R.string.connect)
+                    else -> getString(R.string.connect_sample)
+                }
+                action.setOnClickListener { if (id in connected) disconnect(id) else connect(id) }
+            }
             action.contentDescription = action.text.toString() + " " + label
-            action.setOnClickListener { if (id in connected) disconnect(id) else connect(id) }
             host.addView(row)
         }
     }
 
     private fun connect(provider: String) {
         clearError()
-        if (!sampleMode() && findViewById<TextView>(R.id.offline).visibility == View.VISIBLE) {
+        if (provider == "onedrive") return
+        if (provider == "gphotos" || clientId(provider).isEmpty()) {
+            tokenStore.put("token.$provider", "mock-access.$provider")
+            connected.add(provider)
+            renderProviders()
+            return
+        }
+        startOAuth(provider, "connect")
+    }
+
+    private fun startOAuth(provider: String, purpose: String) {
+        if (!secureStore) {
+            showError(getString(R.string.secure_storage_unavailable))
+            return
+        }
+        if (findViewById<TextView>(R.id.offline).visibility == View.VISIBLE) {
             showError(getString(R.string.offline))
             return
         }
-        val clientId = clientId(provider)
-        if (clientId.isNotEmpty()) {
-            val pkce = Pkce.create()
-            val state = Pkce.create().verifier
-            tokenStore.put("oauth_state", state)
-            tokenStore.put("oauth_verifier", pkce.verifier)
-            val scopes = when (provider) {
-                "dropbox" -> listOf("files.metadata.read", "files.content.read")
-                "onedrive" -> listOf("Files.Read", "offline_access")
-                "gdrive" -> listOf("https://www.googleapis.com/auth/drive.readonly")
-                else -> listOf("https://www.googleapis.com/auth/photoslibrary.readonly")
-            }
-            val url = AuthorizeUrl.build(provider, clientId, "clouddupecleaner://oauth", state, pkce.challenge, scopes)
-            CustomTabsIntent.Builder().build().launchUrl(this, Uri.parse(url))
+        val id = clientId(provider)
+        if (id.isEmpty() || (provider != "dropbox" && provider != "gdrive")) return
+        val redirect = if (provider == "dropbox") BuildConfig.DROPBOX_REDIRECT_URI else BuildConfig.GOOGLE_REDIRECT_URI
+        val allow = listOf(BuildConfig.DROPBOX_REDIRECT_URI, BuildConfig.GOOGLE_REDIRECT_URI).filter { it.isNotEmpty() }
+        val normalized = try {
+            Redirects.normalize(redirect, allow)
+        } catch (error: PolicyException) {
+            showError(error.message ?: getString(R.string.signin_failed))
             return
         }
-        tokenStore.put("token.$provider", "mock-access.$provider")
-        connected.add(provider)
-        renderProviders()
+        val pkce = Pkce.create()
+        val state = Pkce.create().verifier
+        val scopes = if (purpose == "trash") ProviderScopes.trash(provider) else ProviderScopes.connect(provider)
+        tokenStore.put("oauth_state", state)
+        tokenStore.put("oauth_verifier", pkce.verifier)
+        tokenStore.put("oauth_provider", provider)
+        tokenStore.put("oauth_redirect", normalized)
+        tokenStore.put("oauth_purpose", purpose)
+        tokenStore.put("oauth_scopes", scopes.joinToString(" "))
+        val url = AuthorizeUrl.build(provider, id, normalized, state, pkce.challenge, scopes)
+        CustomTabsIntent.Builder().build().launchUrl(this, Uri.parse(url))
     }
 
     private fun disconnect(provider: String) {
-        tokenStore.delete("token.$provider")
+        listOf("token", "refresh", "scopes", "expiry").forEach { tokenStore.delete("$it.$provider") }
         connected.remove(provider)
+        lastFiles.removeAll { it.provider == provider }
         groups = emptyList()
         findViewById<LinearLayout>(R.id.results).removeAllViews()
         findViewById<LinearLayout>(R.id.savings).visibility = View.GONE
-        showEmpty(getString(R.string.empty_connect))
+        showEmpty(getString(if (sampleMode()) R.string.empty_connect else R.string.empty_connect_live))
         renderProviders()
     }
 
     private fun scan() {
+        if (scanning) return
         clearError()
-        val names = PROVIDERS.filter { it.first in connected }
+        val names = PROVIDERS.filter { it.first in connected && it.first != "onedrive" }
         if (names.isEmpty()) {
-            showError(getString(R.string.empty_connect))
+            showError(getString(if (sampleMode()) R.string.empty_connect else R.string.empty_connect_live))
             return
         }
+        if (names.any { isLive(it.first) } && findViewById<TextView>(R.id.offline).visibility == View.VISIBLE) {
+            showError(getString(R.string.offline))
+            return
+        }
+        scanning = true
+        findViewById<Button>(R.id.scan).isEnabled = false
         val progress = findViewById<ProgressBar>(R.id.progress)
         val label = findViewById<TextView>(R.id.progress_label)
         progress.visibility = View.VISIBLE
         label.visibility = View.VISIBLE
         progress.progress = 8
         label.text = getString(R.string.scan_starting)
-        var index = 0
-        val step = object : Runnable {
-            override fun run() {
-                if (index < names.size) {
+        work.execute {
+            val collected = mutableListOf<CloudFile>()
+            val problems = mutableListOf<String>()
+            names.forEachIndexed { index, (id, providerLabel) ->
+                onUi {
                     progress.progress = ((index + 1) * 80 / names.size).coerceAtLeast(8)
-                    label.text = getString(R.string.scanning_provider, names[index].second)
-                    index += 1
-                    progress.postDelayed(this, 220)
-                } else {
-                    label.text = getString(R.string.grouping)
-                    progress.progress = 100
-                    finishScan()
-                    progress.postDelayed({
-                        progress.visibility = View.GONE
-                        label.visibility = View.GONE
-                    }, 200)
+                    label.text = getString(R.string.scanning_provider, providerLabel)
+                }
+                try {
+                    if (isMock(id)) collected.addAll(library.files.filter { it.provider == id })
+                    else if (id == "dropbox" || id == "gdrive") collected.addAll(cloud.list(id))
+                } catch (_: Exception) {
+                    problems.add(providerLabel)
                 }
             }
+            onUi {
+                label.text = getString(R.string.grouping)
+                progress.progress = 100
+                lastFiles.clear()
+                lastFiles.addAll(collected)
+                finishScan()
+                if (problems.isNotEmpty()) showError(getString(R.string.list_failed, problems.joinToString()))
+                scanning = false
+                findViewById<Button>(R.id.scan).isEnabled = true
+                progress.visibility = View.GONE
+                label.visibility = View.GONE
+            }
         }
-        progress.post(step)
     }
 
     private fun finishScan() {
-        val files = library.files.filter { it.provider in connected }
+        val files = lastFiles.toList()
         groups = DuplicateFinder.find(files)
         val wasted = groups.sumOf { it.wastedBytes ?: 0L }
         val savings = findViewById<LinearLayout>(R.id.savings)
@@ -258,16 +360,31 @@ class MainActivity : Activity() {
             "camera" -> R.drawable.sample_camera
             else -> 0
         }
-        if (file.kind == "image" && res != 0) {
-            return ImageView(this).apply {
-                setImageResource(res)
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                contentDescription = getString(R.string.preview_of, file.name)
-                layoutParams = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                )
+        if (file.kind == "image" && res != 0) return imageView(file, res)
+        if (file.kind == "image" && isLive(file.provider) && canPreview(file)) {
+            val view = imageView(file, 0)
+            val cached = thumbCache.get(file.id)
+            if (cached != null) {
+                view.setImageBitmap(cached)
+            } else {
+                view.setBackgroundResource(R.drawable.bg_icon_tile)
+                work.execute {
+                    val bitmap = try {
+                        val bytes = cloud.thumbnail(file)
+                        val options = BitmapFactory.Options().apply {
+                            inSampleSize = if (bytes.size > 1_000_000) 2 else 1
+                        }
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+                    } catch (_: Exception) {
+                        null
+                    }
+                    if (bitmap != null) {
+                        thumbCache.put(file.id, bitmap)
+                        onUi { if (view.tag == file.id) view.setImageBitmap(bitmap) }
+                    }
+                }
             }
+            return view
         }
         return TextView(this).apply {
             text = when (file.kind) {
@@ -287,6 +404,24 @@ class MainActivity : Activity() {
                 FrameLayout.LayoutParams.MATCH_PARENT,
             )
         }
+    }
+
+    private fun imageView(file: CloudFile, res: Int): ImageView {
+        return ImageView(this).apply {
+            tag = file.id
+            if (res != 0) setImageResource(res)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            contentDescription = getString(R.string.preview_of, file.name)
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            )
+        }
+    }
+
+    private fun canPreview(file: CloudFile): Boolean {
+        if (file.provider == "dropbox") return file.path.startsWith("/")
+        return !file.thumbnailUrl.isNullOrBlank()
     }
 
     private fun themeColor(attr: Int): Int {
@@ -355,14 +490,66 @@ class MainActivity : Activity() {
             .setPositiveButton(R.string.move_to_trash) { _, _ ->
                 try {
                     val planned = TrashPolicy.plan(groups, selected, TrashPolicy.TRASH_CONFIRMATION)
-                    planned.forEach { library.trash(it) }
-                    finishScan()
-                    clearError()
+                    val needsAuth = planned.firstOrNull { needsTrashAuth(it.provider) }
+                    if (needsAuth != null) {
+                        tokenStore.put("pending_trash", planned.joinToString("\n") { it.id })
+                        showError(getString(R.string.trash_permission))
+                        startOAuth(needsAuth.provider, "trash")
+                    } else {
+                        executeTrash(planned)
+                    }
                 } catch (error: PolicyException) {
                     showError(error.message ?: getString(R.string.keep_one))
                 }
             }
             .show()
+    }
+
+    private fun continuePendingTrash() {
+        val raw = tokenStore.get("pending_trash").orEmpty()
+        if (raw.isBlank()) return
+        if (groups.isEmpty()) {
+            tokenStore.delete("pending_trash")
+            showError(getString(R.string.trash_again))
+            return
+        }
+        val ids = raw.split('\n').filter { it.isNotBlank() }
+        try {
+            val planned = TrashPolicy.plan(groups, ids, TrashPolicy.TRASH_CONFIRMATION)
+            if (planned.any { needsTrashAuth(it.provider) }) {
+                tokenStore.delete("pending_trash")
+                showError(getString(R.string.trash_permission_missing))
+                return
+            }
+            tokenStore.delete("pending_trash")
+            executeTrash(planned)
+        } catch (error: PolicyException) {
+            tokenStore.delete("pending_trash")
+            showError(error.message ?: getString(R.string.keep_one))
+        }
+    }
+
+    private fun executeTrash(planned: List<CloudFile>) {
+        if (scanning) return
+        scanning = true
+        findViewById<Button>(R.id.scan).isEnabled = false
+        work.execute {
+            var failed = false
+            for (file in planned) {
+                try {
+                    if (isMock(file.provider)) library.trash(file) else cloud.trash(file)
+                    lastFiles.removeAll { it.id == file.id }
+                } catch (_: Exception) {
+                    failed = true
+                }
+            }
+            onUi {
+                finishScan()
+                scanning = false
+                findViewById<Button>(R.id.scan).isEnabled = true
+                if (failed) showError(getString(R.string.trash_failed)) else clearError()
+            }
+        }
     }
 
     private fun confirmAlbum(photos: List<CloudFile>) {
@@ -400,8 +587,8 @@ class MainActivity : Activity() {
     private fun clientId(provider: String): String {
         return when (provider) {
             "dropbox" -> BuildConfig.DROPBOX_CLIENT_ID
-            "onedrive" -> BuildConfig.ONEDRIVE_CLIENT_ID
-            else -> BuildConfig.GOOGLE_CLIENT_ID
+            "gdrive" -> BuildConfig.GOOGLE_CLIENT_ID
+            else -> ""
         }
     }
 

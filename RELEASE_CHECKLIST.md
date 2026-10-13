@@ -6,12 +6,14 @@ These steps need Nick. The app cannot create OAuth clients, buy a host, or submi
 
 Create one client per provider and keep the secrets on the server, not in the Android app or the git repo.
 
-- Google Cloud Console: an Android OAuth client for package `com.njg.clouddupecleaner` plus the SHA-1 of the key you use to sign the release APK. Put the consent screen in Testing and add the Google accounts that may sign in.
-- Dropbox App Console: an app with redirect `https://YOUR_HOST/auth/dropbox/callback` and scopes `files.metadata.read`, `files.content.read`, and `files.content.write` only after trash is confirmed.
-- Microsoft Azure app registration: redirect `https://YOUR_HOST/auth/onedrive/callback`, scopes `Files.Read`, `offline_access`, and `Files.ReadWrite` only for trash.
+- Google Cloud Console: an Android OAuth client for package `com.njg.clouddupecleaner` and the SHA-1 of the release cert `73:0C:21:9F:6E:F5:2A:76:2D:E5:EC:F7:EC:A0:32:B5:18:AE:D5:89`. Put the consent screen in Testing and add the Google accounts that may sign in. Add `https://www.googleapis.com/auth/drive.readonly` for scanning. Add `https://www.googleapis.com/auth/drive` as well, because Google has no trash-only scope; the app asks for it only after you confirm a move to trash. Do not put a client secret in the app.
+- Dropbox App Console: enable PKCE and add the redirect URI `clouddupecleaner://oauth`. Enable `files.metadata.read`, `files.content.read`, and `files.content.write`. The write scope is requested only after you confirm a move to trash. No app secret goes in the APK.
+- Pass `CDC_GOOGLE_CLIENT_ID` and `CDC_DROPBOX_APP_KEY` as environment variables or in `android/local.properties` when building. Do not commit them.
+- Sign the release APK with the same certificate that was registered on the Google Android client. A debug keystore will not pass Google's installed-app check. Dropbox does not check that certificate.
+- Microsoft Azure, when OneDrive is added later: redirect `https://YOUR_HOST/auth/onedrive/callback`, scopes `Files.Read`, `offline_access`, and `Files.ReadWrite` only for trash. The Android app shows OneDrive as coming soon.
 - Google web client, if the server signs in for Drive or Photos: redirects `https://YOUR_HOST/auth/gdrive/callback` and `https://YOUR_HOST/auth/gphotos/callback`.
 
-Until those IDs are configured, both apps stay in sample mode.
+Until the Android IDs are supplied at build time, Dropbox and Drive stay in sample mode. Google Photos stays on sample files either way.
 
 ## Host and HTTPS
 

@@ -61,6 +61,9 @@ test('android manifest and storage keep tokens off backups and unexported surfac
   assert.match(manifest, /android:fullBackupContent="@xml\/backup_rules"/);
   assert.match(manifest, /android:networkSecurityConfig="@xml\/network_security_config"/);
   assert.equal([...manifest.matchAll(/android:exported="true"/g)].length, 2);
+  assert.match(manifest, /android:scheme="clouddupecleaner"/);
+  assert.match(manifest, /\$\{googleRedirectScheme\}/);
+  assert.match(manifest, /android:path="\/oauth2redirect"/);
   assert.doesNotMatch(manifest, /<provider|<service|<receiver/);
   assert.doesNotMatch(manifest, /android:debuggable="true"/);
 

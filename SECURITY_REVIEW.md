@@ -2,7 +2,7 @@
 
 Branch: `feat/build-and-security`
 Date: 2026-10-13
-Scope: Cloud Dupe Cleaner web app and Android app. Demo providers only. No live account sign-in.
+Scope: Cloud Dupe Cleaner web app and Android app. The web app and an Android build without client IDs stay on sample providers. An Android build can sign in to Dropbox and Google Drive when public client IDs are injected at build time. Those IDs are not committed. OneDrive sign-in is not enabled.
 
 This review records what was fixed on the branch and what Nick still has to do. Nothing here was merged, deployed, or published.
 
@@ -12,13 +12,10 @@ This review records what was fixed on the branch and what Nick still has to do. 
 | --- | --- |
 | `npm run lint` | Pass |
 | `npm run typecheck` | Pass |
-| `npm test` | Pass, 23 tests |
-| `npm run build` | Pass |
-| `npm audit` (178 packages) | 0 info, 0 low, 0 moderate, 0 high, 0 critical |
-| gitleaks 8.30.1, full git history (5 commits) | No leaks |
-| Android `:core:test` (Gradle 8.11.1, JDK 21) | Pass |
-| Android `:app:assembleDebug` | Not run. `ANDROID_HOME` is not set in this environment |
-| Aikido SAST | Not run. The Aikido server is installed but requires a sign-in, and this task does not sign in to real accounts |
+| `npm test` | Pass, 24 tests |
+| Android `:core:test` (Gradle 8.11.1, JDK 21) | Pass, 8 tests |
+| Android `:app:assembleDebug` and `:app:assembleRelease` | Pass. Release is unsigned unless the signing env vars are set |
+| Aikido SAST | Not run. The Aikido server requires a sign-in |
 
 ## What changed on this branch
 
@@ -37,7 +34,7 @@ Safe fixes applied here:
 - Optional disk storage is AES-256-GCM. The file mode is `0600` and the directory mode is `0700`. It is off unless `PERSIST_TOKENS=true` and `TOKEN_ENCRYPTION_KEY` is 32 bytes of base64. Production refuses to boot until `MOCK_PROVIDERS`, `PERSIST_TOKENS`, and `SESSION_SIGNING_KEY` are set explicitly. The old `dev-secret-change-me` fallback is gone.
 - Android tokens use `EncryptedSharedPreferences` with a `MasterKey` (`AES256_GCM`) in `AndroidKeyStore`. If the keystore cannot be opened, the fallback is process memory, not plaintext preferences.
 - `allowBackup="false"`, backup and device-transfer rules exclude shared preferences, files, and databases, cleartext traffic is off, and only system CAs are trusted.
-- Exported components are the launcher activity and the OAuth redirect activity (`clouddupecleaner://oauth`). The redirect activity checks `state` with `MessageDigest.isEqual` and does not display, log, or store the authorization code. There are no exported providers, services, or receivers.
+- Exported components are the launcher activity and the OAuth redirect activity. Dropbox returns to `clouddupecleaner://oauth`. Google's Android client returns to the reverse client ID scheme `com.googleusercontent.apps.<id>:/oauth2redirect`, and that scheme is generated from the client ID at build time. The redirect activity checks `state` with `MessageDigest.isEqual`, exchanges the code with PKCE and no client secret, and does not display, log, or store the code. There are no exported providers, services, or receivers.
 
 ## OAuth and scopes
 
@@ -88,11 +85,11 @@ Live mode sends file metadata only to the provider the user connected. The serve
 - `android:allowBackup="false"`
 - `android:fullBackupContent="@xml/backup_rules"` and `android:dataExtractionRules="@xml/data_extraction_rules"` exclude shared preferences, files, and databases for cloud backup and device transfer
 - `android:usesCleartextTraffic="false"` and a network security config that allows only system trust anchors
-- `android:exported="true"` on exactly two activities: `MainActivity` (launcher) and `OAuthRedirectActivity` (browsable `clouddupecleaner://oauth`)
+- `android:exported="true"` on exactly two activities: `MainActivity` (launcher) and `OAuthRedirectActivity` (browsable `clouddupecleaner://oauth`, plus the Google reverse-client scheme when a client ID is present at build time)
 - no `<provider>`, `<service>`, or `<receiver>`
 - release `isDebuggable` is false
 
-Client ids are empty `BuildConfig` fields. The sample connect path does not open a browser. A live connect path exists only when a client id is non-empty, and this build does not contain one.
+`BuildConfig` client IDs are empty unless `CDC_GOOGLE_CLIENT_ID` or `CDC_DROPBOX_APP_KEY` is set in the environment or in `android/local.properties`. Sample connect does not open a browser. Live connect sends no client secret. Trash still requires the confirmation string, keeps one copy, and refuses Drive `files.delete` and Dropbox `permanently_delete`.
 
 ## Residual items for Nick
 
@@ -106,6 +103,6 @@ Client ids are empty `BuildConfig` fields. The sample connect path does not open
 | Low | `photoslibrary.appendonly` can fail when adding photos this app did not upload. The API still cannot trash them. | Treat a failed album as the manual-steps path. Google may also require Photos API approval before production use. |
 | Low | If the Android Keystore cannot be opened, demo tokens stay in process memory (`MemoryTokenStore`). | Do not replace that with plaintext `SharedPreferences`. Fix the device keystore instead. |
 | Info | `androidx.security:security-crypto:1.1.0-alpha06` is still an alpha. | Move to a stable AndroidX security release when one is published. |
-| Info | The OAuth redirect activity must be exported for the browser to return. | Keep the intent filter on `clouddupecleaner://oauth` only. State is checked before the code is accepted. |
+| Info | The OAuth redirect activity must be exported for the browser to return. | Keep Dropbox on `clouddupecleaner://oauth` and Google on the reverse client ID scheme only. State is checked before the code is exchanged. |
 | Info | This environment has no Android SDK, so no APK was built. | Open `android/` in Android Studio, or set `ANDROID_HOME` and run `:app:assembleDebug`. `:core:test` already covers duplicate matching, the trash rules, PKCE, and redirect rejection. |
 | Info | Aikido SAST did not run. | Sign in to Aikido locally if you want that scan. This run did not, because it does not sign in to real accounts. |

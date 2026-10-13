@@ -10,6 +10,7 @@ android/build/
 android/app/build/
 android/core/build/
 android/local.properties
+cdc-oauth*.properties
 *.jks
 *.keystore
 *.iml

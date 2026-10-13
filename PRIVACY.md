@@ -4,9 +4,9 @@ Cloud Dupe Cleaner finds duplicate files in Dropbox, OneDrive, Google Drive, and
 
 ## Demo mode
 
-The Android release build and the default web server ship with no OAuth client IDs. In that mode the apps use built-in sample files. They do not open a provider login and they do not send file names, tokens, or other data to Dropbox, Microsoft, or Google.
+The web app, and an Android build with no OAuth client IDs, use built-in sample files. They do not open a provider login and they do not send file names, tokens, or other data to Dropbox, Microsoft, or Google.
 
-The Android screen says “Demo data. No account sign-in.” Connect sample, scan, and trash actions stay on the phone.
+An Android build can be given a Dropbox app key and a Google Android client ID at build time. Those values are public client IDs, not secrets, and they are not committed. That build can sign in to Dropbox and Google Drive. OneDrive stays unavailable. Google Photos stays on sample files because its API cannot trash items. Tokens from a real sign-in are stored with EncryptedSharedPreferences.
 
 ## Data the apps handle
 

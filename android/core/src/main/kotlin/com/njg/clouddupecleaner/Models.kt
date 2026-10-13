@@ -12,6 +12,7 @@ data class CloudFile(
     val modifiedAt: String? = null,
     val kind: String = "other",
     val sampleKey: String? = null,
+    val thumbnailUrl: String? = null,
 )
 
 data class DuplicateGroup(
@@ -47,6 +48,7 @@ fun cloudFile(
     hashAlgo: String?,
     modifiedAt: String? = null,
     sampleKey: String? = null,
+    thumbnailUrl: String? = null,
 ): CloudFile {
     return CloudFile(
         id = "$provider:$localId",
@@ -60,5 +62,6 @@ fun cloudFile(
         modifiedAt = modifiedAt,
         kind = kindFromName(name),
         sampleKey = sampleKey,
+        thumbnailUrl = thumbnailUrl,
     )
 }

@@ -18,13 +18,13 @@ interface TokenStore {
  */
 class SecureTokenStore private constructor(private val prefs: SharedPreferences) : TokenStore {
     override fun put(key: String, value: String) {
-        prefs.edit().putString(key, value).apply()
+        synchronized(prefs) { prefs.edit().putString(key, value).apply() }
     }
 
-    override fun get(key: String): String? = prefs.getString(key, null)
+    override fun get(key: String): String? = synchronized(prefs) { prefs.getString(key, null) }
 
     override fun delete(key: String) {
-        prefs.edit().remove(key).apply()
+        synchronized(prefs) { prefs.edit().remove(key).apply() }
     }
 
     companion object {
@@ -49,7 +49,7 @@ class SecureTokenStore private constructor(private val prefs: SharedPreferences)
 /** Process-only store used when the Keystore cannot be opened. Nothing is written to disk. */
 class MemoryTokenStore : TokenStore {
     private val values = mutableMapOf<String, String>()
-    override fun put(key: String, value: String) { values[key] = value }
-    override fun get(key: String): String? = values[key]
-    override fun delete(key: String) { values.remove(key) }
+    override fun put(key: String, value: String) { synchronized(values) { values[key] = value } }
+    override fun get(key: String): String? = synchronized(values) { values[key] }
+    override fun delete(key: String) { synchronized(values) { values.remove(key) } }
 }

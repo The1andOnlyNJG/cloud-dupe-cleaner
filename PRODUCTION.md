@@ -45,3 +45,14 @@ The release build reads the keystore from the environment, a Gradle property, or
 Pass them as environment variables or as the same keys in `android/local.properties`. Then run `:app:assembleRelease`. Without all four, the release build is unsigned.
 
 A later Google Android OAuth client for this app needs package name `com.njg.clouddupecleaner` and the SHA-1 of the release signing certificate. Put the consent screen in Testing and add test users before any real Google sign-in.
+
+## Android OAuth client IDs
+
+Public client IDs are read at build time from the environment or from `android/local.properties`. They are written into `BuildConfig` and are not committed. Leave them unset to build sample mode.
+
+| Name | Meaning |
+| --- | --- |
+| `CDC_GOOGLE_CLIENT_ID` | Google Android OAuth client ID. No client secret. |
+| `CDC_DROPBOX_APP_KEY` | Dropbox app key. PKCE, no secret. |
+
+Google sign-in uses the reverse client ID redirect `com.googleusercontent.apps.<id>:/oauth2redirect`. Dropbox uses `clouddupecleaner://oauth` and `token_access_type=offline`. OneDrive is not wired up.
