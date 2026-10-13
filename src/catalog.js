@@ -34,11 +34,11 @@ export const PROVIDERS = [
     blurb: 'Content hash from file metadata.',
     trashable: true,
     trashMethod: 'files/delete_v2 moves the file to Dropbox deleted files, where it can be restored for 30 days.',
-    readScopes: ['files.metadata.read'],
+    readScopes: ['files.metadata.read', 'files.content.read'],
     trashScopes: ['files.content.write'],
     albumScopes: [],
     refreshScopes: [],
-    scopeNote: 'Scanning uses files.metadata.read so the app can list names, sizes, and content hashes. It does not request files.content.read and does not download file bytes. Moving a file to trash needs files.content.write, and that scope is requested only after you confirm.',
+    scopeNote: 'Scanning uses files.metadata.read for names, sizes, and content hashes, plus files.content.read so image previews can call get_thumbnail. Original file bytes are not downloaded for duplicate detection. Moving a file to trash needs files.content.write, and that scope is requested only after you confirm.',
   },
   {
     id: 'onedrive',

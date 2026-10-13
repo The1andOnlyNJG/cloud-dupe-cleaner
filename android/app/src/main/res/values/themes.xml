@@ -7,4 +7,11 @@
         <item name="android:colorAccent">#B6D98A</item>
         <item name="android:textColor">#EEF3EF</item>
     </style>
+    <style name="Theme.CloudDupe.Light" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#F3F0E8</item>
+        <item name="android:navigationBarColor">#F3F0E8</item>
+        <item name="android:windowBackground">#F3F0E8</item>
+        <item name="android:colorAccent">#1F7A4D</item>
+        <item name="android:textColor">#1D1A16</item>
+    </style>
 </resources>

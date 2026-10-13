@@ -8,6 +8,7 @@ import {
   parseDriveFiles,
   parseDropboxEntries,
   parseOneDriveItems,
+  buildThumbnailRequest,
   parsePhotoItems,
 } from '../src/provider-api.js';
 import { cloudFile } from '../src/mock-cloud.js';
@@ -73,4 +74,35 @@ test('trash requests are recoverable and photos cannot be trashed', () => {
     (error) => error instanceof AppError && error.code === 'hard_delete_forbidden',
   );
   assert.throws(() => buildTrashRequest(cloudFile('dropbox', '1', 'a', '/ok/../../etc/passwd', 1, null, null)));
+});
+
+test('thumbnail requests stay on read endpoints and reject foreign hosts', () => {
+  const dropbox = buildThumbnailRequest(
+    cloudFile('dropbox', '1', 'a.jpg', '/Photos/a.jpg', 10, 'h', 'dropbox-content-hash'),
+    'token-value',
+  );
+  assert.equal(dropbox.url, 'https://content.dropboxapi.com/2/files/get_thumbnail_v2');
+  assert.equal(dropbox.method, 'POST');
+  assert.equal(dropbox.url.includes('permanently_delete'), false);
+  assert.equal(dropbox.headers.Authorization, 'Bearer token-value');
+
+  const drive = {
+    ...cloudFile('gdrive', 'f1', 'a.jpg', 'a.jpg', 10, 'h', 'md5'),
+    thumbnailUrl: 'https://lh3.googleusercontent.com/preview',
+  };
+  const driveReq = buildThumbnailRequest(drive, 'token-value');
+  assert.equal(driveReq.url, 'https://lh3.googleusercontent.com/preview');
+  assert.equal(driveReq.method, 'GET');
+  assert.throws(() => buildThumbnailRequest({ ...drive, thumbnailUrl: 'https://evil.example/a.jpg' }, 'token-value'));
+
+  const one = buildThumbnailRequest(cloudFile('onedrive', 'item1', 'a.jpg', '/a.jpg', 1, null, null), 'token-value');
+  assert.equal(one.url, 'https://graph.microsoft.com/v1.0/me/drive/items/item1/thumbnails/0/medium/content');
+  assert.equal(one.url.toLowerCase().includes('permanentdelete'), false);
+
+  const photo = {
+    ...cloudFile('gphotos', 'p1', 'a.jpg', '/a.jpg', 1, null, null),
+    thumbnailUrl: 'https://lh3.googleusercontent.com/photo',
+  };
+  const photoReq = buildThumbnailRequest(photo, 'token-value');
+  assert.equal(photoReq.url, 'https://lh3.googleusercontent.com/photo=w256-h256');
 });

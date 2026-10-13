@@ -2,6 +2,7 @@
 import { AppError } from './errors.js';
 import { REVIEW_ALBUM_TITLE } from './catalog.js';
 import { splitCompositeId } from './mock-cloud.js';
+import { asIso, kindFromName } from './media.js';
 
 const PAGE_LIMIT = 50;
 
@@ -226,6 +227,10 @@ export function parseDropboxEntries(entries) {
       hash,
       hashAlgo: hash ? 'dropbox-content-hash' : null,
       trashable: true,
+      modifiedAt: asIso(entry.client_modified) || asIso(entry.server_modified),
+      kind: kindFromName(entry.name),
+      sampleKey: null,
+      thumbnailUrl: kindFromName(entry.name) === 'image' ? path : null,
     });
   }
   return files;
@@ -248,6 +253,9 @@ export function parseDriveFiles(files) {
     const hashAlgo = md5 ? 'md5' : sha1 ? 'sha1' : null;
     const parsedSize = typeof file.size === 'string' ? Number(file.size) : file.size;
     const size = typeof parsedSize === 'number' && Number.isFinite(parsedSize) ? parsedSize : null;
+    const thumb = typeof file.thumbnailLink === 'string' && file.thumbnailLink.startsWith('https://')
+      ? file.thumbnailLink
+      : null;
     parsed.push({
       id: `gdrive:${file.id}`,
       provider: 'gdrive',
@@ -257,6 +265,10 @@ export function parseDriveFiles(files) {
       hash,
       hashAlgo,
       trashable: true,
+      modifiedAt: asIso(file.modifiedTime),
+      kind: kindFromName(file.name),
+      sampleKey: null,
+      thumbnailUrl: thumb,
     });
   }
   return parsed;
@@ -293,6 +305,10 @@ export function parseOneDriveItems(items) {
       hash,
       hashAlgo,
       trashable: true,
+      modifiedAt: asIso(item.lastModifiedDateTime),
+      kind: kindFromName(item.name),
+      sampleKey: null,
+      thumbnailUrl: kindFromName(item.name) === 'image' ? item.id : null,
     });
   }
   return files;
@@ -309,6 +325,8 @@ export function parsePhotoItems(items) {
   for (const item of items) {
     if (!item || typeof item.id !== 'string') continue;
     const name = typeof item.filename === 'string' && item.filename.trim() ? item.filename : 'Untitled';
+    const baseUrl = typeof item.baseUrl === 'string' && item.baseUrl.startsWith('https://') ? item.baseUrl : null;
+    const created = item.mediaMetadata && asIso(item.mediaMetadata.creationTime);
     files.push({
       id: `gphotos:${item.id}`,
       provider: 'gphotos',
@@ -318,6 +336,10 @@ export function parsePhotoItems(items) {
       hash: null,
       hashAlgo: null,
       trashable: false,
+      modifiedAt: created,
+      kind: kindFromName(name),
+      sampleKey: null,
+      thumbnailUrl: baseUrl,
     });
   }
   return files;
@@ -374,7 +396,7 @@ export async function listDriveFiles(accessToken, fetchImpl) {
     pages += 1;
     const params = new URLSearchParams({
       pageSize: '1000',
-      fields: 'nextPageToken,files(id,name,md5Checksum,sha1Checksum,size,mimeType,trashed)',
+      fields: 'nextPageToken,files(id,name,md5Checksum,sha1Checksum,size,mimeType,trashed,modifiedTime,thumbnailLink)',
       q: "trashed = false and mimeType != 'application/vnd.google-apps.folder'",
       spaces: 'drive',
     });
@@ -397,7 +419,7 @@ export async function listDriveFiles(accessToken, fetchImpl) {
 export async function listOneDriveFiles(accessToken, fetchImpl) {
   /** @type {import('./types.js').CloudFile[]} */
   const files = [];
-  let next = 'https://graph.microsoft.com/v1.0/me/drive/root/delta?$select=id,name,size,file,folder,parentReference,deleted&$top=200';
+  let next = 'https://graph.microsoft.com/v1.0/me/drive/root/delta?$select=id,name,size,file,folder,parentReference,deleted,lastModifiedDateTime&$top=200';
   let pages = 0;
   while (next && pages < PAGE_LIMIT) {
     pages += 1;
@@ -495,4 +517,73 @@ export async function createReviewAlbum(mediaItemIds, accessToken, fetchImpl) {
     },
   );
   return { albumCreated: true, added: added.ok, albumId: album.id };
+}
+
+/**
+ * Preview bytes only. Hosts are fixed or limited to Google thumbnail hosts.
+ * @param {import('./types.js').CloudFile} file
+ * @param {string} accessToken
+ */
+export function buildThumbnailRequest(file, accessToken) {
+  const auth = { Authorization: `Bearer ${accessToken}` };
+  if (file.provider === 'dropbox') {
+    assertDropboxPath(file.path);
+    return {
+      url: 'https://content.dropboxapi.com/2/files/get_thumbnail_v2',
+      method: 'POST',
+      headers: {
+        ...auth,
+        'Dropbox-API-Arg': JSON.stringify({
+          resource: { '.tag': 'path', path: file.path },
+          format: 'jpeg',
+          size: 'w256h256',
+          mode: 'strict',
+        }),
+      },
+      body: undefined,
+    };
+  }
+  if (file.provider === 'onedrive') {
+    const { localId } = splitCompositeId(file.id);
+    assertItemId(localId);
+    return {
+      url: `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(localId)}/thumbnails/0/medium/content`,
+      method: 'GET',
+      headers: auth,
+      body: undefined,
+    };
+  }
+  if (file.provider === 'gdrive' || file.provider === 'gphotos') {
+    const previewUrl = assertPreviewUrl(file.thumbnailUrl);
+    const url = file.provider === 'gphotos' && !previewUrl.includes('=')
+      ? `${previewUrl}=w256-h256`
+      : previewUrl;
+    return { url, method: 'GET', headers: auth, body: undefined };
+  }
+  throw new AppError('unknown_provider', 'Unknown provider.', 404);
+}
+
+/**
+ * @param {string | null} raw
+ * @returns {string}
+ */
+function assertPreviewUrl(raw) {
+  if (!raw) throw new AppError('no_preview', 'This file has no image preview.', 404);
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new AppError('no_preview', 'This file has no image preview.', 404);
+  }
+  if (url.protocol !== 'https:' || url.username || url.password) {
+    throw new AppError('no_preview', 'This file has no image preview.', 404);
+  }
+  const host = url.hostname;
+  const allowed = host === 'lh3.googleusercontent.com'
+    || host === 'lh4.googleusercontent.com'
+    || host === 'lh5.googleusercontent.com'
+    || host === 'lh6.googleusercontent.com'
+    || host.endsWith('.googleusercontent.com');
+  if (!allowed) throw new AppError('no_preview', 'This file has no image preview.', 404);
+  return url.toString();
 }

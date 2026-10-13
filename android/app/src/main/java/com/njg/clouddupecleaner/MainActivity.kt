@@ -2,31 +2,54 @@ package com.njg.clouddupecleaner
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
+import android.view.Gravity
+import android.view.View
 import android.widget.Button
-import android.widget.CheckBox
+import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.TextView
 import androidx.browser.customtabs.CustomTabsIntent
+import java.text.DateFormat
+import java.util.Date
 
 class MainActivity : Activity() {
     private val library = MockLibrary()
     private val connected = linkedSetOf<String>()
-    private val boxes = linkedMapOf<String, CheckBox>()
     private var groups: List<DuplicateGroup> = emptyList()
+    private var keeperId: String = ""
     private lateinit var tokenStore: TokenStore
+    private var dark = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        dark = getSharedPreferences(UI_PREFS, MODE_PRIVATE).getBoolean("dark", true)
+        setTheme(if (dark) R.style.Theme_CloudDupe else R.style.Theme_CloudDupe_Light)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         tokenStore = openStore()
         PROVIDERS.forEach { (id, _) ->
             if (tokenStore.get("token.$id") != null) connected.add(id)
         }
+        findViewById<Button>(R.id.theme_toggle).apply {
+            text = if (dark) "Light" else "Dark"
+            setOnClickListener {
+                getSharedPreferences(UI_PREFS, MODE_PRIVATE).edit().putBoolean("dark", !dark).apply()
+                recreate()
+            }
+        }
         renderProviders()
         findViewById<Button>(R.id.scan).setOnClickListener { scan() }
     }
+
+    private fun ink() = if (dark) 0xFFEEF3EF.toInt() else 0xFF1D1A16.toInt()
+    private fun muted() = if (dark) 0xFFA3B5AA.toInt() else 0xFF5E584F.toInt()
+    private fun card() = if (dark) 0xFF1C2420.toInt() else 0xFFFFFDF8.toInt()
+    private fun accent() = if (dark) 0xFFB6D98A.toInt() else 0xFF1F7A4D.toInt()
 
     private fun openStore(): TokenStore {
         return try {
@@ -45,13 +68,12 @@ class MainActivity : Activity() {
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             val name = TextView(this).apply {
                 text = if (id in connected) "$label · connected" else label
+                setTextColor(ink())
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
             val action = Button(this).apply {
                 text = if (id in connected) "Disconnect" else "Connect sample"
-                setOnClickListener {
-                    if (id in connected) disconnect(id) else connect(id)
-                }
+                setOnClickListener { if (id in connected) disconnect(id) else connect(id) }
             }
             row.addView(name)
             row.addView(action)
@@ -68,7 +90,7 @@ class MainActivity : Activity() {
             tokenStore.put("oauth_verifier", pkce.verifier)
             val redirect = "clouddupecleaner://oauth"
             val scopes = when (provider) {
-                "dropbox" -> listOf("files.metadata.read")
+                "dropbox" -> listOf("files.metadata.read", "files.content.read")
                 "onedrive" -> listOf("Files.Read", "offline_access")
                 "gdrive" -> listOf("https://www.googleapis.com/auth/drive.readonly")
                 else -> listOf("https://www.googleapis.com/auth/photoslibrary.readonly")
@@ -92,67 +114,180 @@ class MainActivity : Activity() {
     }
 
     private fun scan() {
+        val names = PROVIDERS.filter { it.first in connected }
+        val progress = findViewById<ProgressBar>(R.id.progress)
+        val label = findViewById<TextView>(R.id.progress_label)
+        progress.visibility = View.VISIBLE
+        label.visibility = View.VISIBLE
+        progress.progress = 5
+        label.text = "Starting scan…"
+        label.setTextColor(muted())
+        if (names.isEmpty()) {
+            progress.visibility = View.GONE
+            label.visibility = View.GONE
+            return
+        }
+        var index = 0
+        val step = object : Runnable {
+            override fun run() {
+                if (index < names.size) {
+                    progress.progress = ((index + 1) * 80 / names.size)
+                    label.text = "Scanning ${names[index].second}…"
+                    index += 1
+                    progress.postDelayed(this, 180)
+                } else {
+                    label.text = "Grouping duplicates…"
+                    progress.progress = 100
+                    finishScan()
+                    progress.postDelayed({
+                        progress.visibility = View.GONE
+                        label.visibility = View.GONE
+                    }, 250)
+                }
+            }
+        }
+        progress.post(step)
+    }
+
+    private fun finishScan() {
         val files = library.files.filter { it.provider in connected }
         groups = DuplicateFinder.find(files)
-        boxes.clear()
-        val host = findViewById<LinearLayout>(R.id.results)
-        host.removeAllViews()
         val wasted = groups.sumOf { it.wastedBytes ?: 0L }
-        findViewById<TextView>(R.id.summary).text = if (groups.isEmpty()) {
+        val summary = findViewById<TextView>(R.id.summary)
+        summary.setTextColor(ink())
+        summary.text = if (groups.isEmpty()) {
             "No duplicate groups in the connected sample accounts."
         } else {
-            "${groups.size} duplicate groups · $wasted bytes could move to trash"
+            "Space that can move to trash: ${formatBytes(wasted)}\n${groups.size} groups. Open one to keep a copy."
         }
+        val host = findViewById<LinearLayout>(R.id.results)
+        host.removeAllViews()
         groups.forEach { group ->
-            host.addView(TextView(this).apply {
-                text = if (group.match == "content") {
-                    "${group.count} copies · content hash ${group.hashAlgo}"
-                } else {
-                    "${group.count} copies · name and size only"
-                }
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(card())
+                setPadding(24, 24, 24, 24)
+                val gap = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                gap.topMargin = 24
+                layoutParams = gap
+            }
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            group.files.take(2).forEach { file ->
+                row.addView(preview(file, 280))
+            }
+            val title = TextView(this).apply {
+                text = "${group.count} copies · ${formatBytes(group.wastedBytes)} extra"
+                setTextColor(ink())
                 textSize = 18f
-                setPadding(0, 24, 0, 8)
-            })
-            group.files.forEach { file ->
-                if (file.trashable) {
-                    val box = CheckBox(this).apply { text = "${file.provider} · ${file.name} · ${file.path}" }
-                    boxes[file.id] = box
-                    host.addView(box)
-                } else {
-                    host.addView(TextView(this).apply { text = "No trash API · ${file.name}" })
-                }
+                setPadding(0, 16, 0, 0)
             }
-            if (group.files.any { it.trashable }) {
-                host.addView(Button(this).apply {
-                    text = "Move selected to trash"
-                    setOnClickListener { confirmTrash(group) }
-                })
+            val badge = TextView(this).apply {
+                text = if (group.match == "content") "Content hash" else "Name and size only"
+                setTextColor(accent())
             }
-            val photos = group.files.filter { it.provider == "gphotos" }
-            if (photos.isNotEmpty()) {
-                host.addView(Button(this).apply {
-                    text = "Review Photos copies"
-                    setOnClickListener { confirmAlbum(photos) }
-                })
-            }
+            card.addView(row)
+            card.addView(title)
+            card.addView(badge)
+            card.setOnClickListener { openCompare(group) }
+            host.addView(card)
         }
     }
 
-    private fun confirmTrash(group: DuplicateGroup) {
-        val selected = group.files.filter { boxes[it.id]?.isChecked == true }.map { it.id }
-        if (selected.isEmpty()) {
-            findViewById<TextView>(R.id.summary).text = "Select at least one extra copy."
-            return
+    private fun preview(file: CloudFile, size: Int): View {
+        val res = when (file.sampleKey) {
+            "holiday" -> R.drawable.sample_holiday
+            "camera" -> R.drawable.sample_camera
+            else -> 0
+        }
+        if (file.kind == "image" && res != 0) {
+            return ImageView(this).apply {
+                setImageResource(res)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                layoutParams = LinearLayout.LayoutParams(size, size).apply { marginEnd = 12 }
+                contentDescription = file.name
+            }
+        }
+        return TextView(this).apply {
+            text = when (file.kind) {
+                "pdf" -> "PDF"
+                "sheet" -> "SHEET"
+                "text" -> "TEXT"
+                "video" -> "VIDEO"
+                else -> "FILE"
+            }
+            gravity = Gravity.CENTER
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(muted())
+            setBackgroundColor(if (dark) 0xFF24302A.toInt() else 0xFFEFE8DA.toInt())
+            layoutParams = LinearLayout.LayoutParams(size, size).apply { marginEnd = 12 }
+        }
+    }
+
+    private fun openCompare(group: DuplicateGroup) {
+        val keeper = group.files.firstOrNull { it.trashable } ?: group.files.first()
+        keeperId = keeper.id
+        val body = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
+            setPadding(8, 8, 8, 8)
+        }
+        group.files.forEach { file ->
+            body.addView(preview(file, 0).apply {
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 360)
+            })
+            body.addView(TextView(this).apply {
+                text = "${file.name}\n${providerLabel(file.provider)} · ${formatBytes(file.size)}\n${formatDate(file.modifiedAt)}\n${file.path}"
+                setTextColor(ink())
+                setPadding(0, 8, 0, 4)
+            })
+            if (!file.trashable) {
+                body.addView(TextView(this).apply {
+                    text = "No trash API"
+                    setTextColor(0xFFC45D78.toInt())
+                })
+            }
+            body.addView(RadioButton(this).apply {
+                id = View.generateViewId()
+                text = "Keep this one"
+                tag = file.id
+                isChecked = file.id == keeperId
+                setTextColor(ink())
+            })
+        }
+        body.setOnCheckedChangeListener { groupView, checkedId ->
+            val selected = groupView.findViewById<RadioButton>(checkedId)
+            keeperId = selected?.tag as? String ?: keeperId
         }
         AlertDialog.Builder(this)
+            .setTitle(if (group.match == "content") "Same content hash" else "Name and size only")
+            .setView(body)
+            .setNegativeButton("Close", null)
+            .setNeutralButton("Review Photos") { _, _ ->
+                val photos = group.files.filter { it.provider == "gphotos" }
+                if (photos.isNotEmpty()) confirmAlbum(photos)
+            }
+            .setPositiveButton("Move other copies to trash") { _, _ ->
+                val extras = group.files.filter { it.trashable && it.id != keeperId }.map { it.id }
+                if (extras.isEmpty() || extras.size >= group.files.size) {
+                    findViewById<TextView>(R.id.summary).text = "Leave at least one copy in the group."
+                } else {
+                    confirmTrash(group, extras)
+                }
+            }
+            .show()
+    }
+
+    private fun confirmTrash(group: DuplicateGroup, selected: List<String>) {
+        val names = group.files.filter { it.id in selected }.joinToString("\n") { "${it.name} · ${it.path}" }
+        AlertDialog.Builder(this)
             .setTitle("Move ${selected.size} files to trash?")
-            .setMessage(getString(R.string.trash_message))
+            .setMessage("${getString(R.string.trash_message)}\n\n$names")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Move to trash") { _, _ ->
                 val planned = TrashPolicy.plan(groups, selected, TrashPolicy.TRASH_CONFIRMATION)
                 planned.forEach { library.trash(it) }
-                scan()
-                findViewById<TextView>(R.id.summary).text = "Moved ${planned.size} files to trash."
+                finishScan()
+                findViewById<TextView>(R.id.summary).text =
+                    "Moved ${planned.size} files to trash. The copy you kept is still there."
             }
             .show()
     }
@@ -171,6 +306,26 @@ class MainActivity : Activity() {
             .show()
     }
 
+    private fun providerLabel(id: String) = PROVIDERS.find { it.first == id }?.second ?: id
+
+    private fun formatBytes(bytes: Long?): String {
+        if (bytes == null) return "Size unknown"
+        if (bytes < 1024) return "$bytes B"
+        val kb = bytes / 1024.0
+        if (kb < 1024) return String.format("%.1f KB", kb)
+        return String.format("%.1f MB", kb / 1024.0)
+    }
+
+    private fun formatDate(iso: String?): String {
+        if (iso.isNullOrBlank()) return "Date unknown"
+        return try {
+            val time = java.time.Instant.parse(iso).toEpochMilli()
+            DateFormat.getDateInstance().format(Date(time))
+        } catch (_: Exception) {
+            iso
+        }
+    }
+
     private fun clientId(provider: String): String {
         return when (provider) {
             "dropbox" -> BuildConfig.DROPBOX_CLIENT_ID
@@ -180,6 +335,7 @@ class MainActivity : Activity() {
     }
 
     companion object {
+        private const val UI_PREFS = "ui_prefs"
         val PROVIDERS = listOf(
             "dropbox" to "Dropbox",
             "onedrive" to "OneDrive",

@@ -43,7 +43,7 @@ Safe fixes applied here:
 
 | Provider | Scan scope | Extra scope, only after confirm | Why it is the smallest fit |
 | --- | --- | --- | --- |
-| Dropbox | `files.metadata.read` | `files.content.write` | Metadata includes `content_hash`. The app does not request `files.content.read` and does not download bytes. `delete_v2` needs content write. |
+| Dropbox | `files.metadata.read` and `files.content.read` | `files.content.write` | Metadata includes `content_hash`. `files.content.read` is only for `get_thumbnail` previews, not full-file downloads. `delete_v2` needs content write. |
 | OneDrive | `Files.Read` plus `offline_access` | `Files.ReadWrite` | Own drive only, not `Files.ReadWrite.All`. `offline_access` is for refresh, not more files. Item delete moves to the recycle bin. |
 | Google Drive | `drive.readonly` | `https://www.googleapis.com/auth/drive` | `drive.file` cannot see or trash files this app did not create. Google has no trash-only scope. |
 | Google Photos | `photoslibrary.readonly` | `photoslibrary.appendonly` for the review album only | The Library API cannot trash items, so there is no delete scope. |
@@ -100,7 +100,7 @@ Client ids are empty `BuildConfig` fields. The sample connect path does not open
 | --- | --- | --- |
 | Medium | The old Electron screen stored client secrets and tokens in plaintext on the PC, if it was ever used with real keys. Those values are not in git. | If real Google, Dropbox, or Microsoft secrets were pasted into that screen, rotate them in each developer console and delete the Electron user-data store. |
 | Medium | `https://www.googleapis.com/auth/drive` can permanently delete as well as trash. Google does not offer a trash-only scope. | Keep the app on `files.update` with `trashed: true`. Do not add `files.delete`. Use Google's restricted-scope verification before a public client. |
-| Medium | Dropbox `files.content.write` and OneDrive `Files.ReadWrite` can also call permanent-delete endpoints. | Keep the URL guard. Do not add `Files.ReadWrite.All`, `files.content.read`, or a call to `permanently_delete` / `permanentDelete`. |
+| Medium | Dropbox `files.content.write` and OneDrive `Files.ReadWrite` can also call permanent-delete endpoints. | Keep the URL guard. Do not add `Files.ReadWrite.All` or a call to `permanently_delete` / `permanentDelete`. `files.content.read` is limited to thumbnail previews. |
 | Low | Web access tokens are plaintext in process memory. Disk encryption applies only when persistence is turned on. | For a shared or production host, set `SESSION_SIGNING_KEY` and, if you persist sessions, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`). Serve HTTPS so the cookie gets `Secure`. Leave `HOST=127.0.0.1` unless a reverse proxy terminates TLS. |
 | Low | If any process was actually started with `SESSION_SECRET=dev-secret-change-me`, that default was guessable. gitleaks did not find a live secret. | Rotate that deployment's session secret. No cloud API key was found in history, so there is no leaked provider key to rotate from the repo itself. |
 | Low | `photoslibrary.appendonly` can fail when adding photos this app did not upload. The API still cannot trash them. | Treat a failed album as the manual-steps path. Google may also require Photos API approval before production use. |

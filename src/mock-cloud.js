@@ -1,6 +1,7 @@
 // @ts-check
 import { AppError } from './errors.js';
 import { REVIEW_ALBUM_TITLE } from './catalog.js';
+import { kindFromName } from './media.js';
 
 /**
  * @param {import('./types.js').ProviderId} provider
@@ -10,9 +11,10 @@ import { REVIEW_ALBUM_TITLE } from './catalog.js';
  * @param {number | null} size
  * @param {string | null} hash
  * @param {import('./types.js').HashAlgo | null} hashAlgo
+ * @param {{ modifiedAt?: string | null, sampleKey?: string | null }} [extra]
  * @returns {import('./types.js').CloudFile}
  */
-export function cloudFile(provider, localId, name, path, size, hash, hashAlgo) {
+export function cloudFile(provider, localId, name, path, size, hash, hashAlgo, extra = {}) {
   return {
     id: `${provider}:${localId}`,
     provider,
@@ -22,22 +24,26 @@ export function cloudFile(provider, localId, name, path, size, hash, hashAlgo) {
     hash,
     hashAlgo,
     trashable: provider !== 'gphotos',
+    modifiedAt: extra.modifiedAt || null,
+    kind: kindFromName(name),
+    sampleKey: extra.sampleKey || null,
+    thumbnailUrl: null,
   };
 }
 
 /** @returns {import('./types.js').CloudFile[]} */
 export function seedFiles() {
   return [
-    cloudFile('dropbox', 'dbx-holiday-a', 'holiday.jpg', '/Photos/2024/holiday.jpg', 2400000, 'c0ffeeholiday', 'dropbox-content-hash'),
-    cloudFile('dropbox', 'dbx-holiday-b', 'holiday-copy.jpg', '/Photos/2024/copies/holiday-copy.jpg', 2400000, 'c0ffeeholiday', 'dropbox-content-hash'),
-    cloudFile('gdrive', 'drv-nda-a', 'nda.pdf', 'Contracts/nda.pdf', 88000, '0a11ce0a', 'md5'),
-    cloudFile('gdrive', 'drv-nda-b', 'nda-final.pdf', 'Contracts/archive/nda-final.pdf', 88000, '0a11ce0a', 'md5'),
-    cloudFile('onedrive', 'od-budget-a', 'budget.xlsx', '/Documents/budget.xlsx', 56000, 'a1b2c3d4e5f60789', 'sha1'),
-    cloudFile('onedrive', 'od-budget-b', 'budget (1).xlsx', '/Documents/budget (1).xlsx', 56000, 'a1b2c3d4e5f60789', 'sha1'),
-    cloudFile('onedrive', 'od-notes-a', 'notes.txt', '/Notes/notes.txt', 4096, null, null),
-    cloudFile('onedrive', 'od-notes-b', 'notes.txt', '/Backup/notes.txt', 4096, null, null),
-    cloudFile('gphotos', 'ph-img-a', 'IMG_2048.JPG', '/IMG_2048.JPG', 3100000, null, null),
-    cloudFile('gphotos', 'ph-img-b', 'IMG_2048.JPG', '/Albums/Camera/IMG_2048.JPG', 3100000, null, null),
+    cloudFile('dropbox', 'dbx-holiday-a', 'holiday.jpg', '/Photos/2024/holiday.jpg', 2400000, 'c0ffeeholiday', 'dropbox-content-hash', { modifiedAt: '2024-07-12T15:04:00.000Z', sampleKey: 'holiday' }),
+    cloudFile('dropbox', 'dbx-holiday-b', 'holiday-copy.jpg', '/Photos/2024/copies/holiday-copy.jpg', 2400000, 'c0ffeeholiday', 'dropbox-content-hash', { modifiedAt: '2024-08-02T09:18:00.000Z', sampleKey: 'holiday' }),
+    cloudFile('gdrive', 'drv-nda-a', 'nda.pdf', 'Contracts/nda.pdf', 88000, '0a11ce0a', 'md5', { modifiedAt: '2023-11-03T18:00:00.000Z' }),
+    cloudFile('gdrive', 'drv-nda-b', 'nda-final.pdf', 'Contracts/archive/nda-final.pdf', 88000, '0a11ce0a', 'md5', { modifiedAt: '2024-01-19T11:40:00.000Z' }),
+    cloudFile('onedrive', 'od-budget-a', 'budget.xlsx', '/Documents/budget.xlsx', 56000, 'a1b2c3d4e5f60789', 'sha1', { modifiedAt: '2024-03-01T08:12:00.000Z' }),
+    cloudFile('onedrive', 'od-budget-b', 'budget (1).xlsx', '/Documents/budget (1).xlsx', 56000, 'a1b2c3d4e5f60789', 'sha1', { modifiedAt: '2024-03-01T08:40:00.000Z' }),
+    cloudFile('onedrive', 'od-notes-a', 'notes.txt', '/Notes/notes.txt', 4096, null, null, { modifiedAt: '2024-05-22T16:05:00.000Z' }),
+    cloudFile('onedrive', 'od-notes-b', 'notes.txt', '/Backup/notes.txt', 4096, null, null, { modifiedAt: '2024-06-01T07:55:00.000Z' }),
+    cloudFile('gphotos', 'ph-img-a', 'IMG_2048.JPG', '/IMG_2048.JPG', 3100000, null, null, { modifiedAt: '2024-09-14T13:22:00.000Z', sampleKey: 'camera' }),
+    cloudFile('gphotos', 'ph-img-b', 'IMG_2048.JPG', '/Albums/Camera/IMG_2048.JPG', 3100000, null, null, { modifiedAt: '2024-09-14T13:22:00.000Z', sampleKey: 'camera' }),
     cloudFile('dropbox', 'dbx-unique', 'readme.txt', '/readme.txt', 1280, 'deadbeef', 'dropbox-content-hash'),
     cloudFile('gphotos', 'ph-nosize', 'clip.mp4', '/clip.mp4', null, null, null),
     cloudFile('onedrive', 'od-qx-a', 'reel.mov', '/Video/reel.mov', 900000, 'qxhash123', 'quickXor'),

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,10 +12,13 @@
     <header class="top">
       <div>
         <p class="eyebrow">Cloud Dupe Cleaner</p>
-        <h1>Keep one copy. Trash the rest.</h1>
-        <p class="lede">Scan Dropbox, OneDrive, Google Drive, and Google Photos. Content hashes are used when a provider gives one. Otherwise the match is name and size, and it is labeled as weaker. Extras move to trash only after you confirm.</p>
+        <h1>Keep one copy.</h1>
+        <p class="lede">See duplicate photos and files side by side. Extras move to trash only after you confirm, and one copy always stays.</p>
       </div>
-      <p id="mode-pill" class="pill">Loading</p>
+      <div class="top-actions">
+        <button id="theme-toggle" class="ghost" type="button">Light theme</button>
+        <p id="mode-pill" class="pill">Loading</p>
+      </div>
     </header>
 
     <div id="banner" class="banner" role="status" hidden></div>
@@ -29,21 +32,45 @@
         <div id="providers" class="providers"></div>
       </section>
 
-      <section class="scan-row">
+      <section class="scan-panel">
         <div class="scan-actions">
           <button id="scan" class="primary" type="button" disabled>Scan for duplicates</button>
-          <button id="select-extras" class="ghost" type="button" hidden>Select extra copies</button>
         </div>
-        <p id="summary" class="summary">Connect an account to scan.</p>
+        <div id="progress-wrap" class="progress-wrap" hidden>
+          <div class="progress-track" aria-hidden="true"><div id="progress-bar" class="progress-bar"></div></div>
+          <p id="progress-label">Scanning…</p>
+        </div>
+        <section id="savings" class="savings" hidden>
+          <p class="savings-kicker">Space that can move to trash</p>
+          <p id="savings-value" class="savings-value">0 MB</p>
+          <p id="savings-detail" class="savings-detail"></p>
+        </section>
       </section>
 
-      <section id="results" class="results" aria-live="polite"></section>
+      <section id="results" class="group-grid" aria-live="polite"></section>
     </main>
 
     <footer>
-      <p>Dropbox, Drive, and OneDrive moves go to that service’s trash or recycle bin. This app never permanently deletes. Google Photos has no trash API, so those copies are flagged for a review album or a manual step.</p>
+      <p>Dropbox, Drive, and OneDrive moves go to that service’s trash or recycle bin. Nothing is permanently deleted. Google Photos has no trash API, so those copies are flagged for a review album.</p>
     </footer>
   </div>
+
+  <dialog id="compare-dialog" aria-labelledby="compare-title">
+    <div class="dialog-head">
+      <div>
+        <p id="compare-kicker" class="eyebrow">Compare</p>
+        <h3 id="compare-title">Copies</h3>
+      </div>
+      <button id="compare-close" class="ghost" type="button">Close</button>
+    </div>
+    <p id="compare-note" class="meta"></p>
+    <div id="compare-grid" class="compare-grid"></div>
+    <p id="compare-error" class="form-error" hidden></p>
+    <div class="dialog-actions">
+      <button id="compare-photos" class="ghost" type="button" hidden>Review Photos copies</button>
+      <button id="compare-trash" class="danger" type="button">Move the other copies to trash</button>
+    </div>
+  </dialog>
 
   <dialog id="confirm-dialog" aria-labelledby="confirm-title">
     <h3 id="confirm-title">Move files to trash?</h3>

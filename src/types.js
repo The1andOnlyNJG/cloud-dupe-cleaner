@@ -5,6 +5,7 @@
  * @typedef {'dropbox-content-hash' | 'md5' | 'sha1' | 'quickXor'} HashAlgo
  * @typedef {'connect' | 'trash' | 'album'} OAuthPurpose
  * @typedef {'content' | 'weak'} MatchKind
+ * @typedef {'image' | 'video' | 'pdf' | 'sheet' | 'text' | 'other'} FileKind
  */
 
 /**
@@ -17,6 +18,10 @@
  * @property {string | null} hash
  * @property {HashAlgo | null} hashAlgo
  * @property {boolean} trashable
+ * @property {string | null} modifiedAt
+ * @property {FileKind} kind
+ * @property {string | null} sampleKey
+ * @property {string | null} thumbnailUrl
  */
 
 /**
@@ -70,6 +75,7 @@
  * @property {Record<string, ProviderToken>} providers
  * @property {Record<string, OAuthTxn>} oauth
  * @property {{ groups: DuplicateGroup[], scannedAt: number } | null} scan
+ * @property {Record<string, CloudFile[]> | null} scanParts
  * @property {MockState} mock
  */
 

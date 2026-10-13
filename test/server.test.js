@@ -22,7 +22,7 @@ test('demo flow connects, scans, requires confirmation, and only trashes after a
     assert.notEqual(after.cookie, cookieBeforeConnect);
     const dropbox = after.data.providers.find((/** @type {{ id: string }} */ item) => item.id === 'dropbox');
     assert.equal(dropbox.connected, true);
-    assert.deepEqual(dropbox.grantedScopes, ['files.metadata.read']);
+    assert.deepEqual(dropbox.grantedScopes, ['files.metadata.read', 'files.content.read']);
     assert.equal(JSON.stringify(after.data).includes('mock-access'), false);
 
     const scan = await api('/api/scan', { method: 'POST', csrf: after.data.csrf, body: {} });
@@ -30,6 +30,12 @@ test('demo flow connects, scans, requires confirmation, and only trashes after a
     assert.ok(holiday);
     assert.equal(holiday.match, 'content');
     const extra = holiday.files[1].id;
+    const preview = await api(`/api/preview?id=${encodeURIComponent(holiday.files[0].id)}`);
+    assert.equal(preview.response.status, 200);
+    assert.match(preview.response.headers.get('content-type') || '', /image\/png/);
+    const bytes = new Uint8Array(await preview.response.arrayBuffer());
+    assert.equal(bytes[0], 0x89);
+    assert.equal(bytes[1], 0x50);
 
     const noCsrf = await api('/api/trash', { method: 'POST', body: { ids: [extra], confirmation: 'MOVE_TO_TRASH' } });
     assert.equal(noCsrf.response.status, 403);

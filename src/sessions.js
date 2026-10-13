@@ -78,6 +78,7 @@ function freshSession() {
     providers: {},
     oauth: {},
     scan: null,
+    scanParts: null,
     mock: createMockState(),
   };
 }

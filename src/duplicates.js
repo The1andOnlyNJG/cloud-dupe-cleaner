@@ -1,6 +1,7 @@
 // @ts-check
 import { createHash } from 'node:crypto';
 import { AppError } from './errors.js';
+import { safeSampleKey } from './media.js';
 
 /**
  * @param {import('./types.js').CloudFile[]} files
@@ -136,7 +137,10 @@ export function presentGroup(group) {
       name: file.name,
       path: file.path,
       size: file.size,
+      modifiedAt: file.modifiedAt,
+      kind: file.kind,
       trashable: file.trashable,
+      hasPreview: file.kind === 'image' && Boolean(safeSampleKey(file.sampleKey) || file.thumbnailUrl),
     })),
   };
 }

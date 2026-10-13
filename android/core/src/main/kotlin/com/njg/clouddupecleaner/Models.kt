@@ -9,6 +9,9 @@ data class CloudFile(
     val hash: String?,
     val hashAlgo: String?,
     val trashable: Boolean,
+    val modifiedAt: String? = null,
+    val kind: String = "other",
+    val sampleKey: String? = null,
 )
 
 data class DuplicateGroup(
@@ -22,6 +25,18 @@ data class DuplicateGroup(
     val files: List<CloudFile>,
 )
 
+fun kindFromName(name: String): String {
+    val ext = name.substringAfterLast('.', "").lowercase()
+    return when (ext) {
+        "jpg", "jpeg", "png", "gif", "webp", "heic" -> "image"
+        "mp4", "mov", "webm", "mkv" -> "video"
+        "pdf" -> "pdf"
+        "xls", "xlsx", "csv" -> "sheet"
+        "txt", "md" -> "text"
+        else -> "other"
+    }
+}
+
 fun cloudFile(
     provider: String,
     localId: String,
@@ -30,6 +45,8 @@ fun cloudFile(
     size: Long?,
     hash: String?,
     hashAlgo: String?,
+    modifiedAt: String? = null,
+    sampleKey: String? = null,
 ): CloudFile {
     return CloudFile(
         id = "$provider:$localId",
@@ -40,5 +57,8 @@ fun cloudFile(
         hash = hash,
         hashAlgo = hashAlgo,
         trashable = provider != "gphotos",
+        modifiedAt = modifiedAt,
+        kind = kindFromName(name),
+        sampleKey = sampleKey,
     )
 }

@@ -1,6 +1,6 @@
 // @ts-check
 import path from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import express from 'express';
@@ -24,9 +24,11 @@ import {
   buildRefreshRequest,
   buildTokenRequest,
   createReviewAlbum,
+  buildThumbnailRequest,
   executeTrash,
   listProviderFiles,
 } from './provider-api.js';
+import { safeSampleKey } from './media.js';
 import { createRateLimiter } from './rate-limit.js';
 import { createSessionStore, readCookie, signSessionId, verifySessionId } from './sessions.js';
 
@@ -202,14 +204,54 @@ async function scanSession(session, config, fetchImpl) {
   }
   const groups = findDuplicates(files);
   session.scan = { groups, scannedAt: Date.now() };
+  return presentScan(files.length, groups, errors, Object.keys(session.providers).length === 0);
+}
+
+/**
+ * @param {number} totalFiles
+ * @param {import('./types.js').DuplicateGroup[]} groups
+ * @param {{ provider: string, message: string }[]} errors
+ * @param {boolean} noneConnected
+ */
+function presentScan(totalFiles, groups, errors, noneConnected) {
+  const wastedBytes = groups.reduce((sum, group) => sum + (group.wastedBytes || 0), 0);
   return {
-    totalFiles: files.length,
+    totalFiles,
     groups: groups.map(presentGroup),
     errors,
-    message: session.providers && Object.keys(session.providers).length === 0
-      ? 'Connect a provider before scanning.'
-      : '',
+    summary: {
+      totalFiles,
+      groupCount: groups.length,
+      wastedBytes,
+    },
+    message: noneConnected ? 'Connect a provider before scanning.' : '',
   };
+}
+
+/**
+ * @param {import('./types.js').SessionData} session
+ * @param {import('./types.js').ProviderId} provider
+ * @param {import('./types.js').AppConfig} config
+ * @param {typeof fetch} fetchImpl
+ */
+async function listConnected(session, provider, config, fetchImpl) {
+  if (!session.providers[provider]) throw new AppError('not_connected', 'Connect this provider first.', 401);
+  if (config.mock) return session.mock.files.filter((file) => file.provider === provider);
+  return listWithRefresh(session, provider, config, fetchImpl);
+}
+
+/**
+ * @param {import('./types.js').SessionData} session
+ * @param {string} id
+ * @param {boolean} mock
+ */
+function findKnownFile(session, id, mock) {
+  /** @type {import('./types.js').CloudFile[]} */
+  const files = [];
+  if (session.scan) files.push(...session.scan.groups.flatMap((group) => group.files));
+  if (session.scanParts) files.push(...Object.values(session.scanParts).flat());
+  if (mock) files.push(...session.mock.files);
+  return files.find((file) => file.id === id) || null;
 }
 
 /**
@@ -429,6 +471,83 @@ export function createApp(options) {
   app.post('/api/scan', requireCsrf, wrap(async (req, res) => {
     const result = await scanSession(req.session, config, fetchImpl);
     res.json(result);
+  }));
+
+  app.post('/api/scan/reset', requireCsrf, wrap(async (req, res) => {
+    const connected = PROVIDER_IDS.filter((provider) => req.session.providers[provider]);
+    req.session.scanParts = {};
+    req.session.scan = null;
+    res.json({ providers: connected, total: connected.length });
+  }));
+
+  app.post('/api/scan/step', requireCsrf, wrap(async (req, res) => {
+    const provider = getProvider(typeof req.body?.provider === 'string' ? req.body.provider : '');
+    if (!provider) throw new AppError('unknown_provider', 'Unknown provider.', 404);
+    if (!req.session.scanParts) req.session.scanParts = {};
+    const files = await listConnected(req.session, provider.id, config, fetchImpl);
+    req.session.scanParts[provider.id] = files;
+    const connected = PROVIDER_IDS.filter((id) => req.session.providers[id]);
+    const done = connected.filter((id) => req.session.scanParts && req.session.scanParts[id]).length;
+    res.json({
+      provider: provider.id,
+      fileCount: files.length,
+      done,
+      total: connected.length,
+    });
+  }));
+
+  app.post('/api/scan/finish', requireCsrf, wrap(async (req, res) => {
+    /** @type {import('./types.js').CloudFile[]} */
+    const files = req.session.scanParts ? Object.values(req.session.scanParts).flat() : [];
+    const groups = findDuplicates(files);
+    req.session.scan = { groups, scannedAt: Date.now() };
+    res.json(presentScan(files.length, groups, [], Object.keys(req.session.providers).length === 0));
+  }));
+
+  app.get('/api/preview', wrap(async (req, res) => {
+    const id = typeof req.query.id === 'string' ? req.query.id : '';
+    const file = findKnownFile(req.session, id, config.mock);
+    if (!file || file.kind !== 'image') {
+      res.status(404).end();
+      return;
+    }
+    if (config.mock) {
+      const key = safeSampleKey(file.sampleKey);
+      const samplePath = key ? path.join(resolvePublicDir(), 'samples', `${key}.png`) : '';
+      if (!key || !existsSync(samplePath)) {
+        res.status(404).end();
+        return;
+      }
+      res.set('Content-Type', 'image/png');
+      res.set('Cache-Control', 'private, max-age=300');
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.end(readFileSync(samplePath));
+      return;
+    }
+    const token = req.session.providers[file.provider];
+    if (!token) {
+      res.status(404).end();
+      return;
+    }
+    const request = buildThumbnailRequest(file, token.accessToken);
+    const response = await fetchImpl(request.url, {
+      method: request.method,
+      headers: request.headers,
+      body: request.body,
+    });
+    if (!response.ok) {
+      res.status(404).end();
+      return;
+    }
+    const type = response.headers.get('content-type') || 'image/jpeg';
+    if (!type.startsWith('image/')) {
+      res.status(404).end();
+      return;
+    }
+    res.set('Content-Type', type.split(';')[0]);
+    res.set('Cache-Control', 'private, no-store');
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.end(Buffer.from(await response.arrayBuffer()));
   }));
 
   app.post('/api/trash', requireCsrf, wrap(async (req, res) => {

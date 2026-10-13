@@ -45,7 +45,7 @@ test('redirect allowlist rejects open redirects and normalization tricks', () =>
 
 test('authorize URLs are authorization-code plus PKCE and omit the client secret', () => {
   const cases = [
-    ['dropbox', 'connect', 'https://www.dropbox.com/oauth2/authorize', ['files.metadata.read']],
+    ['dropbox', 'connect', 'https://www.dropbox.com/oauth2/authorize', ['files.metadata.read', 'files.content.read']],
     ['onedrive', 'connect', 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize', ['Files.Read', 'offline_access']],
     ['gdrive', 'connect', 'https://accounts.google.com/o/oauth2/v2/auth', ['https://www.googleapis.com/auth/drive.readonly']],
     ['gphotos', 'connect', 'https://accounts.google.com/o/oauth2/v2/auth', ['https://www.googleapis.com/auth/photoslibrary.readonly']],
@@ -81,9 +81,9 @@ test('trash and album scopes are requested only for that purpose', () => {
     'https://www.googleapis.com/auth/drive',
   ]);
   assert.ok(scopesForPurpose(dropbox, 'connect')?.includes('files.metadata.read'));
+  assert.ok(scopesForPurpose(dropbox, 'connect')?.includes('files.content.read'));
   assert.equal(scopesForPurpose(dropbox, 'connect')?.includes('files.content.write'), false);
   assert.ok(scopesForPurpose(dropbox, 'trash')?.includes('files.content.write'));
-  assert.equal(scopesForPurpose(dropbox, 'trash')?.includes('files.content.read'), false);
   assert.deepEqual(missingScopes(['Files.Read', 'offline_access'], ['Files.ReadWrite']), ['Files.ReadWrite']);
 });
 
