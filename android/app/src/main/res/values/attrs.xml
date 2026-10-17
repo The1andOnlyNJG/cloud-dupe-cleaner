@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <attr name="cdcBg" format="color" />
+    <attr name="cdcCard" format="color" />
+    <attr name="cdcTile" format="color" />
+    <attr name="cdcText" format="color" />
+    <attr name="cdcMuted" format="color" />
+    <attr name="cdcAccent" format="color" />
+    <attr name="cdcAccentInk" format="color" />
+    <attr name="cdcLine" format="color" />
+    <attr name="cdcDanger" format="color" />
+</resources>

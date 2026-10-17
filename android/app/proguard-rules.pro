@@ -1,0 +1,31 @@
+-keep class com.njg.clouddupecleaner.MainActivity { *; }
+-keep class com.njg.clouddupecleaner.OAuthRedirectActivity { *; }
+-keep class com.njg.clouddupecleaner.SecureTokenStore { *; }
+-keep class com.njg.clouddupecleaner.SecureTokenStore$Companion { *; }
+-keep class com.njg.clouddupecleaner.MemoryTokenStore { *; }
+-keep class com.njg.clouddupecleaner.BuildConfig { *; }
+-keep class com.njg.clouddupecleaner.CloudClient { *; }
+-keep class com.njg.clouddupecleaner.DriveDropbox { *; }
+-keep class com.njg.clouddupecleaner.ApiHosts { *; }
+-keep class com.njg.clouddupecleaner.InstalledAppRedirect { *; }
+-keep class com.njg.clouddupecleaner.ProviderScopes { *; }
+-keep class com.njg.clouddupecleaner.AuthorizeUrl { *; }
+-keep class com.njg.clouddupecleaner.Redirects { *; }
+-keep class com.njg.clouddupecleaner.Pkce { *; }
+-keep class com.njg.clouddupecleaner.DuplicateFinder { *; }
+-keep class com.njg.clouddupecleaner.TrashPolicy { *; }
+-keep class com.njg.clouddupecleaner.MockLibrary { *; }
+-keep class com.njg.clouddupecleaner.MockLibrary$Companion { *; }
+-keep class com.njg.clouddupecleaner.TokenResponse { *; }
+-keep class com.njg.clouddupecleaner.ApiCall { *; }
+-keep class com.njg.clouddupecleaner.FilePage { *; }
+-keep class com.njg.clouddupecleaner.CloudFile { *; }
+-keep class com.njg.clouddupecleaner.DuplicateGroup { *; }
+-keep class androidx.security.crypto.** { *; }
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+-dontwarn com.google.errorprone.annotations.CanIgnoreReturnValue
+-dontwarn com.google.errorprone.annotations.CheckReturnValue
+-dontwarn com.google.errorprone.annotations.Immutable
+-dontwarn com.google.errorprone.annotations.RestrictedApi
+-dontwarn javax.annotation.Nullable
+-dontwarn javax.annotation.concurrent.GuardedBy
