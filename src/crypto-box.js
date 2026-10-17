@@ -12,7 +12,7 @@ export function encryptJson(value, key) {
     throw new Error('Encryption key must be 32 bytes.');
   }
   const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const cipher = createCipheriv('aes-256-gcm', key, iv, { authTagLength: 16 });
   const plaintext = Buffer.from(JSON.stringify(value), 'utf8');
   const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   const tag = cipher.getAuthTag();
@@ -43,7 +43,7 @@ export function decryptJson(payload, key) {
   if (iv.length !== 12 || tag.length !== 16) {
     throw new Error('Encrypted payload is not valid.');
   }
-  const decipher = createDecipheriv('aes-256-gcm', key, iv);
+  const decipher = createDecipheriv('aes-256-gcm', key, iv, { authTagLength: 16 });
   decipher.setAuthTag(tag);
   const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
   return JSON.parse(plaintext.toString('utf8'));

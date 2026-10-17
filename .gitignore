@@ -15,3 +15,5 @@ cdc-oauth*.properties
 *.keystore
 *.iml
 .DS_Store
+run-local.sh
+*.properties.local
